@@ -113,9 +113,13 @@ jobs:
 
           gh label create dependencies --color 0366d6 \
             --description 'Automated dependency update' --force
-          gh pr create \
+          pr_url="$(gh pr create \
             --base main \
             --head "${branch}" \
             --title 'chore(deps): update parity reference toolchain' \
             --label dependencies \
-            --body 'Updates the checksum-verified, non-shipping KoSIT/XRechnung parity toolchain. The centralized dependency policy enables squash auto-merge only after protected CI passes. Toolchain updates never publish module releases.'
+            --body 'Updates the checksum-verified, non-shipping KoSIT/XRechnung parity toolchain. The centralized dependency policy enables squash auto-merge only after protected CI passes. Toolchain updates never publish module releases.')"
+          gh workflow run ci.yml --ref "${branch}"
+          gh workflow run dependency-automerge.yml \
+            --ref main \
+            -f pull_request="${pr_url##*/}"
