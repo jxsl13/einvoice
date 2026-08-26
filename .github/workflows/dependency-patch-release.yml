@@ -69,6 +69,35 @@ jobs:
           jq -r '.[] | "- #\(.number) \(.title)"' \
             "${RUNNER_TEMP}/pending-dependencies.json" > "${RUNNER_TEMP}/dependency-notes.md"
 
+      - name: Keep feature releases manual
+        if: steps.pending.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest="$(gh release list --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')"
+          if [[ -z "${latest}" ]]; then
+            echo 'Create the first feature/pre-release manually.' >&2
+            exit 1
+          fi
+          git rev-parse --verify "refs/tags/${latest}" >/dev/null
+
+          blocked=false
+          while read -r commit; do
+            prs="$(gh api -H 'Accept: application/vnd.github+json' \
+              "repos/${GITHUB_REPOSITORY}/commits/${commit}/pulls")"
+            if ! jq -e 'any(.[]; any(.labels[]; .name == "dependencies"))' \
+              <<<"${prs}" >/dev/null; then
+              echo "Unreleased non-dependency commit: ${commit}" >&2
+              blocked=true
+            fi
+          done < <(git rev-list "${latest}..HEAD")
+          if [[ "${blocked}" == true ]]; then
+            echo 'Tag the feature release manually before a dependency patch can be published.' >&2
+            exit 1
+          fi
+
       - name: Set up Go
         if: steps.pending.outputs.count != '0'
         uses: actions/setup-go@v5
@@ -108,9 +137,13 @@ jobs:
             echo 'Create the first feature/pre-release manually before dependency patch releases.' >&2
             exit 1
           fi
-          next="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))${BASH_REMATCH[4]}"
+          major="${BASH_REMATCH[1]}"
+          minor="${BASH_REMATCH[2]}"
+          patch="${BASH_REMATCH[3]}"
+          suffix="${BASH_REMATCH[4]}"
+          next="v${major}.${minor}.$((patch + 1))${suffix}"
           prerelease=false
-          if [[ -n "${BASH_REMATCH[4]}" ]]; then prerelease=true; fi
+          if [[ -n "${suffix}" ]]; then prerelease=true; fi
           echo "tag=${next}" >> "${GITHUB_OUTPUT}"
           echo "prerelease=${prerelease}" >> "${GITHUB_OUTPUT}"
 
