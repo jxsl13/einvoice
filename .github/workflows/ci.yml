@@ -151,6 +151,31 @@ jobs:
         markers="$(printf '%s\n' 'Dependency-PR: #7' 'Go-Dependency-PR: #8' 'Toolchain-PR: #9' | sed -n -E 's/^(Go-)?Dependency-PR: #([0-9]+)$/\2/p' | paste -sd, -)"
         test "${markers}" = '7,8'
 
+    - name: Test automatic dependency merge eligibility policy
+      shell: bash
+      run: |
+        set -euo pipefail
+        filter=.github/release/dependency-automerge.jq
+        assert_eligible() {
+          jq -e -f "${filter}" <<<"$1" >/dev/null
+        }
+        assert_ineligible() {
+          if jq -e -f "${filter}" <<<"$1" >/dev/null; then
+            echo 'Unexpected automatic merge eligibility' >&2
+            exit 1
+          fi
+        }
+
+        assert_eligible '{"author":{"login":"dependabot[bot]"},"isDraft":false,"labels":[{"name":"dependencies"},{"name":"release:patch"}],"files":[{"path":"go.mod"},{"path":"go.sum"}]}'
+        assert_eligible '{"author":{"login":"dependabot[bot]"},"isDraft":false,"labels":[{"name":"dependencies"}],"files":[{"path":".github/workflows/ci.yml"}]}'
+        assert_eligible '{"author":{"login":"github-actions[bot]"},"isDraft":false,"labels":[{"name":"dependencies"}],"files":[{"path":".github/dependencies/parity.json"}]}'
+
+        assert_ineligible '{"author":{"login":"dependabot[bot]"},"isDraft":true,"labels":[{"name":"dependencies"}],"files":[{"path":"go.mod"}]}'
+        assert_ineligible '{"author":{"login":"dependabot[bot]"},"isDraft":false,"labels":[],"files":[{"path":"go.mod"}]}'
+        assert_ineligible '{"author":{"login":"dependabot[bot]"},"isDraft":false,"labels":[{"name":"dependencies"}],"files":[{"path":"go.mod"},{"path":"README.md"}]}'
+        assert_ineligible '{"author":{"login":"github-actions[bot]"},"isDraft":false,"labels":[{"name":"dependencies"}],"files":[{"path":".github/dependencies/parity.json"},{"path":"README.md"}]}'
+        assert_ineligible '{"author":{"login":"jxsl13"},"isDraft":false,"labels":[{"name":"dependencies"}],"files":[{"path":"go.mod"}]}'
+
     - name: Reject Java artifacts and build a static CLI
       shell: bash
       run: |
