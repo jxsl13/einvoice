@@ -33,8 +33,9 @@ type SemanticError struct {
 //	    }
 //	}
 type ValidationError struct {
-	violations []SemanticError
-	warnings   []SemanticError
+	violations  []SemanticError
+	warnings    []SemanticError
+	information []SemanticError
 }
 
 // Error implements the error interface.
@@ -86,6 +87,11 @@ func (e *ValidationError) Warnings() []SemanticError {
 	warnings := make([]SemanticError, len(e.warnings))
 	copy(warnings, e.warnings)
 	return warnings
+}
+
+// Information returns a copy of non-rejecting informational findings.
+func (e *ValidationError) Information() []SemanticError {
+	return append([]SemanticError(nil), e.information...)
 }
 
 // WarningCount returns the number of validation warnings.
@@ -163,6 +169,11 @@ func (inv *Invoice) addWarning(rule rules.Rule, text string) {
 	})
 }
 
+func (inv *Invoice) addInfo(rule rules.Rule, text string) {
+	inv.checkContext()
+	inv.information = append(inv.information, SemanticError{Rule: rule, Text: text})
+}
+
 // Warnings returns a copy of all validation warnings found during the last Validate() call.
 // Warnings are recommendation violations ("soll"/"should") that don't cause validation
 // to fail but are reported for user attention.
@@ -193,6 +204,11 @@ func (inv *Invoice) Warnings() []SemanticError {
 // HasWarnings returns true if there are any warnings from the last Validate() call.
 func (inv *Invoice) HasWarnings() bool {
 	return len(inv.warnings) > 0
+}
+
+// Information returns a copy of informational findings from the last validation.
+func (inv *Invoice) Information() []SemanticError {
+	return append([]SemanticError(nil), inv.information...)
 }
 
 // Validate checks the invoice against applicable business rules with intelligent auto-detection.
@@ -262,6 +278,7 @@ func (inv *Invoice) ValidateContext(ctx context.Context) (err error) {
 	// Always clear previous violations and warnings to ensure idempotency
 	inv.violations = []SemanticError{}
 	inv.warnings = []SemanticError{}
+	inv.information = []SemanticError{}
 
 	// Determine if we should validate:
 	// - For parsed invoices (CII/UBL): Only validate if they claim EN 16931 compliance via BT-24
@@ -269,6 +286,8 @@ func (inv *Invoice) ValidateContext(ctx context.Context) (err error) {
 	shouldValidate := inv.SchemaType == SchemaTypeUnknown || inv.isEN16931Compliant()
 
 	if shouldValidate {
+		inv.checkContext()
+		inv.validateSyntaxRules()
 		inv.checkContext()
 		inv.validateCore()
 		inv.checkContext()
@@ -278,7 +297,7 @@ func (inv *Invoice) ValidateContext(ctx context.Context) (err error) {
 		inv.checkContext()
 
 		// Auto-detect and run PEPPOL validation based on specification identifier
-		if inv.isPEPPOL() {
+		if inv.isPEPPOL() || inv.GuidelineSpecifiedDocumentContextParameter == SpecXRechnung30 {
 			inv.validatePEPPOL()
 		} else {
 			// For non-PEPPOL invoices, still validate line calculations under BR-USER-05
@@ -305,8 +324,9 @@ func (inv *Invoice) ValidateContext(ctx context.Context) (err error) {
 	// Return error if violations exist (include warnings for convenience)
 	if len(inv.violations) > 0 {
 		return &ValidationError{
-			violations: inv.violations,
-			warnings:   inv.warnings,
+			violations:  inv.violations,
+			warnings:    inv.warnings,
+			information: inv.information,
 		}
 	}
 

@@ -87,6 +87,13 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	inventory.Capabilities = []ruleinventory.Capability{
+		{Group: "infrastructure", Supported: true},
+		{Group: "standard", Supported: true},
+		{Group: "peppol", Supported: true},
+		{Group: "extension", Supported: false, Reason: "profile is explicitly unsupported by the stable rule pack"},
+		{Group: "cvd", Supported: false, Reason: "profile is explicitly unsupported by the stable rule pack"},
+	}
 	data, err := ruleinventory.Marshal(inventory)
 	if err != nil {
 		return err
@@ -115,7 +122,7 @@ func sourceDigest(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read source member: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
 		return "", fmt.Errorf("digest source member: %w", err)
@@ -136,13 +143,13 @@ func materializeSchematron(archivePath, expectedDigest string) (string, func(), 
 	if err != nil {
 		return "", func() {}, fmt.Errorf("open Schematron archive: %w", err)
 	}
-	defer archive.Close()
+	defer func() { _ = archive.Close() }()
 	info, err := archive.Stat()
 	if err != nil {
 		return "", func() {}, fmt.Errorf("stat Schematron archive: %w", err)
 	}
 	if !info.Mode().IsRegular() || info.Size() > maxArchiveBytes {
-		return "", func() {}, errors.New("Schematron archive is not a bounded regular file")
+		return "", func() {}, errors.New("schematron archive is not a bounded regular file")
 	}
 	hash := sha256.New()
 	if _, err := io.Copy(hash, archive); err != nil {
@@ -150,14 +157,14 @@ func materializeSchematron(archivePath, expectedDigest string) (string, func(), 
 	}
 	actualDigest := fmt.Sprintf("%x", hash.Sum(nil))
 	if len(expectedDigest) != sha256.Size*2 || !strings.EqualFold(actualDigest, expectedDigest) {
-		return "", func() {}, fmt.Errorf("Schematron archive digest mismatch: got %s", actualDigest)
+		return "", func() {}, fmt.Errorf("schematron archive digest mismatch: got %s", actualDigest)
 	}
 
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return "", func() {}, fmt.Errorf("open Schematron ZIP: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	wanted := make(map[string]bool, len(schematronMembers))
 	for _, name := range schematronMembers {
 		wanted[name] = false
@@ -179,7 +186,7 @@ func materializeSchematron(archivePath, expectedDigest string) (string, func(), 
 		}
 		if !member.Mode().IsRegular() || member.UncompressedSize64 > 8<<20 {
 			cleanup()
-			return "", func() {}, fmt.Errorf("Schematron member %q is not a bounded regular file", name)
+			return "", func() {}, fmt.Errorf("schematron member %q is not a bounded regular file", name)
 		}
 		destination := filepath.Join(temporary, filepath.FromSlash(strings.TrimPrefix(name, "schematron/")))
 		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
@@ -193,7 +200,7 @@ func materializeSchematron(archivePath, expectedDigest string) (string, func(), 
 		}
 		output, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err != nil {
-			input.Close()
+			_ = input.Close()
 			cleanup()
 			return "", func() {}, fmt.Errorf("create member %q: %w", name, err)
 		}

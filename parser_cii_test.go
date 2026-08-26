@@ -5,7 +5,42 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/shopspring/decimal"
 )
+
+func TestCIIParserPreservesZeroAmountPresenceAndRounding(t *testing.T) {
+	t.Parallel()
+
+	xml := `<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
+ xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+ <rsm:SupplyChainTradeTransaction>
+  <ram:ApplicableHeaderTradeSettlement>
+   <ram:SpecifiedTradeAllowanceCharge>
+    <ram:ChargeIndicator><ram:Indicator>false</ram:Indicator></ram:ChargeIndicator>
+    <ram:ActualAmount>0</ram:ActualAmount>
+   </ram:SpecifiedTradeAllowanceCharge>
+   <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+    <ram:RoundingAmount>0.01</ram:RoundingAmount>
+   </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+  </ram:ApplicableHeaderTradeSettlement>
+ </rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>`
+
+	inv, err := ParseReader(strings.NewReader(xml))
+	if err != nil {
+		t.Fatalf("parse CII: %v", err)
+	}
+	if len(inv.SpecifiedTradeAllowanceCharge) != 1 || !inv.SpecifiedTradeAllowanceCharge[0].hasActualAmountInXML {
+		t.Fatal("document allowance amount presence was not preserved")
+	}
+	if !inv.SpecifiedTradeAllowanceCharge[0].ActualAmount.IsZero() {
+		t.Fatalf("allowance amount = %s, want zero", inv.SpecifiedTradeAllowanceCharge[0].ActualAmount)
+	}
+	if !inv.RoundingAmount.Equal(decimal.RequireFromString("0.01")) {
+		t.Fatalf("rounding amount = %s, want 0.01", inv.RoundingAmount)
+	}
+}
 
 func TestSimple(t *testing.T) {
 	t.Parallel()

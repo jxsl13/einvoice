@@ -271,6 +271,11 @@ var (
 		Fields:      nil,
 		Description: `Business process MUST be in the format 'urn:fdc:peppol.eu:2017:poacc:billing:NN:1.0' where NN indicates the process number.`,
 	}
+	PEPPOLEN16931R8 = Rule{
+		Code:        "PEPPOL-EN16931-R008",
+		Fields:      nil,
+		Description: `Document MUST not contain empty elements.`,
+	}
 	PEPPOLEN16931R10 = Rule{
 		Code:        "PEPPOL-EN16931-R010",
 		Fields:      nil,
@@ -300,6 +305,26 @@ var (
 		Code:        "PEPPOL-EN16931-R043",
 		Fields:      nil,
 		Description: `Allowance/charge ChargeIndicator value MUST equal 'true' or 'false'`,
+	}
+	PEPPOLEN16931R431 = Rule{
+		Code:        "PEPPOL-EN16931-R043-1",
+		Fields:      nil,
+		Description: `Allowance/charge ChargeIndicator value MUST equal 'true' or 'false'.`,
+	}
+	PEPPOLEN16931R432 = Rule{
+		Code:        "PEPPOL-EN16931-R043-2",
+		Fields:      nil,
+		Description: `Price allowance ChargeIndicator value MUST equal 'true' or 'false'.`,
+	}
+	PEPPOLEN16931R44 = Rule{
+		Code:        "PEPPOL-EN16931-R044",
+		Fields:      nil,
+		Description: `Price-level allowance ChargeIndicator MUST be false.`,
+	}
+	PEPPOLEN16931R46 = Rule{
+		Code:        "PEPPOL-EN16931-R046",
+		Fields:      nil,
+		Description: `Item net price MUST equal gross price minus price discount.`,
 	}
 	PEPPOLEN16931R53 = Rule{
 		Code:        "PEPPOL-EN16931-R053",

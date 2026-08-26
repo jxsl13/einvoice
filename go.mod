@@ -1,12 +1,13 @@
 module github.com/jxsl13/einvoice
 
-go 1.25.0
+go 1.26.2
 
 tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 
 require (
 	github.com/beevik/etree v1.7.1
 	github.com/google/go-cmp v0.7.0
+	github.com/jacoelho/xsd v0.3.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/speedata/cxpath v0.0.10
 	github.com/speedata/pdfdisassembler v0.0.7

@@ -585,6 +585,13 @@ func TestGermanValidation_BRDE19_20_IBANValidation(t *testing.T) {
 			ruleCode:    rules.BRDE19,
 		},
 		{
+			name:        "warning: structurally valid IBAN with invalid checksum",
+			typeCode:    58,
+			iban:        "DE89370400440532013001",
+			wantWarning: true,
+			ruleCode:    rules.BRDE19,
+		},
+		{
 			name:        "valid: SEPA direct debit with valid IBAN",
 			typeCode:    59,
 			iban:        "DE89370400440532013000",
@@ -623,6 +630,21 @@ func TestGermanValidation_BRDE19_20_IBANValidation(t *testing.T) {
 				t.Errorf("%s warning = %v, want %v", tt.ruleCode.Code, hasWarning, tt.wantWarning)
 			}
 		})
+	}
+}
+
+func TestGermanValidation_BRDE30_UsesUBLSellerSEPAIdentifier(t *testing.T) {
+	t.Parallel()
+
+	inv := createGermanTestInvoice()
+	inv.SchemaType = UBL
+	inv.Seller.GlobalID = []GlobalID{{Scheme: "SEPA", ID: "DE98ZZZ09999999999"}}
+	inv.PaymentMeans = []PaymentMeans{{TypeCode: 59, PayerPartyDebtorFinancialAccountIBAN: "DE89370400440532013000"}}
+	inv.SpecifiedTradePaymentTerms = []SpecifiedTradePaymentTerms{{DirectDebitMandateID: "MANDATE-1"}}
+
+	err := inv.Validate()
+	if hasRuleViolation(err, rules.BRDE30) {
+		t.Fatal("BR-DE-30 must accept the UBL seller SEPA identifier mapping for BT-90")
 	}
 }
 

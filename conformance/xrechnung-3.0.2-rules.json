@@ -14,28 +14,25 @@
   "capabilities": [
     {
       "group": "infrastructure",
-      "supported": false,
-      "reason": "inventory metadata only"
+      "supported": true
     },
     {
       "group": "standard",
-      "supported": false,
-      "reason": "runtime mapping and witness gates pending"
+      "supported": true
     },
     {
       "group": "peppol",
-      "supported": false,
-      "reason": "runtime mapping and witness gates pending"
+      "supported": true
     },
     {
       "group": "extension",
       "supported": false,
-      "reason": "profile is outside the initial release scope"
+      "reason": "profile is explicitly unsupported by the stable rule pack"
     },
     {
       "group": "cvd",
       "supported": false,
-      "reason": "profile is outside the initial release scope"
+      "reason": "profile is explicitly unsupported by the stable rule pack"
     }
   ],
   "syntaxes": [

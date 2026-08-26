@@ -4,8 +4,6 @@
 
 # einvoice - a Go library to read, write and verify electronic invoices
 
-**Work in progress**
-
 This is an independently versioned public fork of
 [speedata/einvoice](https://github.com/speedata/einvoice). It retains the
 upstream history and BSD-3-Clause attribution while using the Go module path
@@ -13,9 +11,9 @@ upstream history and BSD-3-Clause attribution while using the Go module path
 release policy and [CONFORMANCE.md](CONFORMANCE.md) for the public validation
 baseline and release gates.
 
-No release is authoritative for German fiscal issuance until its published
-conformance report satisfies the rule-coverage and KoSIT parity gates. Java is
-never part of the module, its release assets, or consuming production systems.
+The stable pure-Go XRechnung rule pack is backed by published, reproducible
+KoSIT differential evidence. Java is used only by the isolated CI oracle and is
+never part of the module, release assets, or production runtime.
 
 This library will be used to read, write and verify electronic invoices (XML) which conform to the EN 16931 standard.
 
@@ -24,6 +22,25 @@ This library will be used to read, write and verify electronic invoices (XML) wh
     go get github.com/jxsl13/einvoice
 
 ## Usage
+
+For bounded XRechnung 3.0.2 validation, use the stable rule pack:
+
+```go
+result, err := validator.Validate(ctx, input, validator.Options{
+	RulePack: validator.RulePackXRechnung302,
+})
+if err != nil {
+	// Typed operational error: malformed input, unsupported profile, limit, etc.
+}
+if !result.Accepted {
+	// result.Findings contains deterministic rule IDs and message codes.
+}
+```
+
+This API supports standard UBL 2.1 Invoice/CreditNote and CII D16B XRechnung
+3.0.2 documents. Extension and CVD profiles fail closed as unsupported.
+
+The lower-level API remains available for parsing, writing, and compatibility:
 
 ```go
 invoice, err := einvoice.ParseXMLFile(filename)

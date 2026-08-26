@@ -132,7 +132,7 @@ func Generate(request Request) (Inventory, error) {
 		return Inventory{}, errors.New("rule inventory root is required")
 	}
 	if strings.TrimSpace(request.Phase) == "" {
-		return Inventory{}, errors.New("Schematron phase is required")
+		return Inventory{}, errors.New("schematron phase is required")
 	}
 	if len(request.Sources) == 0 {
 		return Inventory{}, errors.New("at least one syntax source is required")
@@ -273,7 +273,7 @@ func loadDocument(root, path string, loading map[string]bool, result *document) 
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	decoder := xml.NewDecoder(io.LimitReader(file, 8<<20))
 	decoder.Strict = true
@@ -422,7 +422,7 @@ func fileSHA256(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	info, err := file.Stat()
 	if err != nil {
 		return "", err

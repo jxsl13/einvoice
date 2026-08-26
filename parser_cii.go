@@ -100,6 +100,7 @@ func parseCII(operationCtx context.Context, ctx *cxpath.Context) (*Invoice, erro
 	root := ctx.Root()
 
 	inv := &Invoice{SchemaType: CII, operationContext: operationCtx}
+	inv.peppolEmptyElementCount = root.Eval("count(//*[not(self::ram:ApplicableHeaderTradeDelivery) and not(*) and not(normalize-space())])").Int()
 	inv.checkContext()
 
 	var err error
@@ -156,6 +157,9 @@ func parseCIIExchangedDocument(exchangedDocument *cxpath.Context, inv *Invoice) 
 
 func parseCIISupplyChainTradeTransaction(supplyChainTradeTransaction *cxpath.Context, inv *Invoice) error {
 	var err error
+	for code := range supplyChainTradeTransaction.Each(".//ram:ApplicableTradeTax/ram:DueDateTypeCode") {
+		inv.ciiDueDateTypeCodes = append(inv.ciiDueDateTypeCodes, code.String())
+	}
 	// BG-25
 	for lineItem := range supplyChainTradeTransaction.Each("ram:IncludedSupplyChainTradeLineItem") {
 		inv.checkContext()
@@ -213,6 +217,11 @@ func parseCIISupplyChainTradeTransaction(supplyChainTradeTransaction *cxpath.Con
 				CategoryTradeTaxType:                  allowanceCharge.Eval("ram:CategoryTradeTax/ram:TypeCode").String(),
 				CategoryTradeTaxCategoryCode:          allowanceCharge.Eval("ram:CategoryTradeTax/ram:CategoryCode").String(),
 				CategoryTradeTaxRateApplicablePercent: categoryTaxRate,
+				hasActualAmountInXML:                  allowanceCharge.Eval("count(ram:ActualAmount)").Int() > 0,
+				hasBasisAmountInXML:                   allowanceCharge.Eval("count(ram:BasisAmount)").Int() > 0,
+				hasPercentInXML:                       allowanceCharge.Eval("count(ram:CalculationPercent)").Int() > 0,
+				hasIndicatorInXML:                     allowanceCharge.Eval("count(ram:ChargeIndicator/udt:Indicator)").Int() > 0,
+				indicatorValidXML:                     isXMLBoolean(allowanceCharge.Eval("ram:ChargeIndicator/udt:Indicator").String()),
 			}
 			// Im Fall eines Abschlags (BG-27) ist der Wert des ChargeIndicators auf "false" zu setzen.
 			// Im Fall eines Zuschlags (BG-28) ist der Wert des ChargeIndicators auf "true" zu setzen.
@@ -223,15 +232,23 @@ func parseCIISupplyChainTradeTransaction(supplyChainTradeTransaction *cxpath.Con
 			}
 		}
 
-		taxInfo := lineItem.Eval("ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax")
-		// BG-27, BG-28
-		invoiceLine.TaxTypeCode = taxInfo.Eval("ram:TypeCode").String()
-		invoiceLine.TaxCategoryCode = taxInfo.Eval("ram:CategoryCode").String()
-		invoiceLine.TaxRateApplicablePercent, err = getDecimal(taxInfo, "ram:RateApplicablePercent")
-		if err != nil {
-			return err
+		lineTradeTaxCount := lineItem.Eval("count(ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax)").Int()
+		if lineTradeTaxCount != 1 {
+			inv.ciiLineTradeTaxInvalid = true
 		}
-		invoiceLine.hasTaxRateApplicablePercent = taxInfo.Eval("count(ram:RateApplicablePercent)").Int() > 0
+		// The semantic model has one line VAT category. If malformed CII supplies
+		// multiple BG-30 groups, bind the first one exactly as the CII Schematron
+		// does for scalar business terms; CII-SR-454 reports the cardinality.
+		for taxInfo := range lineItem.Each("ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax") {
+			invoiceLine.TaxTypeCode = taxInfo.Eval("ram:TypeCode").String()
+			invoiceLine.TaxCategoryCode = taxInfo.Eval("ram:CategoryCode").String()
+			invoiceLine.TaxRateApplicablePercent, err = getDecimal(taxInfo, "ram:RateApplicablePercent")
+			if err != nil {
+				return err
+			}
+			invoiceLine.hasTaxRateApplicablePercent = taxInfo.Eval("count(ram:RateApplicablePercent)").Int() > 0
+			break
+		}
 		// BR-CO-20: Track BG-26 (INVOICE LINE PERIOD) presence to validate later
 		invoiceLine.linePeriodPresent = lineItem.Eval("count(ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod)").Int() > 0
 		invoiceLine.BillingSpecifiedPeriodStart, err = parseCIITime(lineItem, "ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime/udt:DateTimeString")
@@ -244,7 +261,9 @@ func parseCIISupplyChainTradeTransaction(supplyChainTradeTransaction *cxpath.Con
 		}
 
 		// BT-128: Referenced document (line level)
+		invoiceLine.lineDocumentReferenceCount = lineItem.Eval("count(ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument)").Int()
 		invoiceLine.AdditionalReferencedDocumentID = lineItem.Eval("ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument/ram:IssuerAssignedID").String()
+		invoiceLine.AdditionalReferencedDocumentTypeCode = lineItem.Eval("ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument/ram:TypeCode").String()
 
 		inv.InvoiceLines = append(inv.InvoiceLines, invoiceLine)
 	}
@@ -297,6 +316,7 @@ func parseCIIApplicableHeaderTradeAgreement(applicableHeaderTradeAgreement *cxpa
 
 		doc.AttachmentFilename = additionalDocument.Eval("ram:AttachmentBinaryObject/@filename").String()
 		doc.AttachmentMimeCode = additionalDocument.Eval("ram:AttachmentBinaryObject/@mimeCode").String()
+		doc.URIID = additionalDocument.Eval("ram:URIID").String()
 		doc.Name = additionalDocument.Eval("ram:Name").String()
 		doc.TypeCode = additionalDocument.Eval("ram:TypeCode").String()
 		doc.ReferenceTypeCode = additionalDocument.Eval("ram:ReferenceTypeCode").String()
@@ -365,6 +385,10 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 			hasPayeeAccountInXML:       paymentMeans.Eval("count(ram:PayeePartyCreditorFinancialAccount)").Int() > 0,
 			hasPayeeIBANInXML:          paymentMeans.Eval("count(ram:PayeePartyCreditorFinancialAccount/ram:IBANID)").Int() > 0,
 			hasPayeeProprietaryIDInXML: paymentMeans.Eval("count(ram:PayeePartyCreditorFinancialAccount/ram:ProprietaryID)").Int() > 0,
+			hasPaymentCardInXML:        paymentMeans.Eval("count(ram:ApplicableTradeSettlementFinancialCard)").Int() > 0,
+			hasPayerAccountIDInXML:     paymentMeans.Eval("count(ram:PayerPartyDebtorFinancialAccount/ram:IBANID)").Int() > 0,
+			hasPayeeInstitutionInXML:   paymentMeans.Eval("count(ram:PayeeSpecifiedCreditorFinancialInstitution)").Int() > 0,
+			hasPayerInstitutionInXML:   paymentMeans.Eval("count(ram:PayerSpecifiedDebtorFinancialInstitution)").Int() > 0,
 		}
 		inv.PaymentMeans = append(inv.PaymentMeans, thisPaymentMeans)
 	}
@@ -398,6 +422,11 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 			CategoryTradeTaxType:                  allowanceCharge.Eval("ram:CategoryTradeTax/ram:TypeCode").String(),
 			CategoryTradeTaxCategoryCode:          allowanceCharge.Eval("ram:CategoryTradeTax/ram:CategoryCode").String(),
 			CategoryTradeTaxRateApplicablePercent: categoryTaxRate,
+			hasActualAmountInXML:                  allowanceCharge.Eval("count(ram:ActualAmount)").Int() > 0,
+			hasBasisAmountInXML:                   allowanceCharge.Eval("count(ram:BasisAmount)").Int() > 0,
+			hasPercentInXML:                       allowanceCharge.Eval("count(ram:CalculationPercent)").Int() > 0,
+			hasIndicatorInXML:                     allowanceCharge.Eval("count(ram:ChargeIndicator/udt:Indicator)").Int() > 0,
+			indicatorValidXML:                     isXMLBoolean(allowanceCharge.Eval("ram:ChargeIndicator/udt:Indicator").String()),
 		}
 		inv.SpecifiedTradeAllowanceCharge = append(inv.SpecifiedTradeAllowanceCharge, allowanceCharge)
 	}
@@ -418,6 +447,7 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 		charge := AllowanceCharge{
 			ChargeIndicator:                       true, // Logistics charges are always charges, not allowances
 			ActualAmount:                          appliedAmount,
+			hasActualAmountInXML:                  logisticsCharge.Eval("count(ram:AppliedAmount)").Int() > 0,
 			Reason:                                logisticsCharge.Eval("ram:Description").String(),
 			CategoryTradeTaxType:                  logisticsCharge.Eval("ram:AppliedTradeTax/ram:TypeCode").String(),
 			CategoryTradeTaxCategoryCode:          logisticsCharge.Eval("ram:AppliedTradeTax/ram:CategoryCode").String(),
@@ -438,6 +468,8 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 	}
 
 	// ram:SpecifiedTradePaymentTerms
+	inv.ciiPaymentTermsCount = applicableHeaderTradeSettlement.Eval("count(ram:SpecifiedTradePaymentTerms)").Int()
+	inv.ciiPaymentDescriptionCount = applicableHeaderTradeSettlement.Eval("count(ram:SpecifiedTradePaymentTerms/ram:Description)").Int()
 	for paymentTerm := range applicableHeaderTradeSettlement.Each("ram:SpecifiedTradePaymentTerms") {
 		inv.checkContext()
 		spt := SpecifiedTradePaymentTerms{}
@@ -451,6 +483,7 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 		inv.SpecifiedTradePaymentTerms = append(inv.SpecifiedTradePaymentTerms, spt)
 	}
 
+	inv.ciiTaxPointDateMax = applicableHeaderTradeSettlement.Eval("count(ram:ApplicableTradeTax/ram:TaxPointDate)").Int()
 	for att := range applicableHeaderTradeSettlement.Each("ram:ApplicableTradeTax") {
 		inv.checkContext()
 		tradeTax := TradeTax{}
@@ -462,6 +495,8 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 		if err != nil {
 			return err
 		}
+		tradeTax.hasBasisAmountInXML = att.Eval("count(ram:BasisAmount)").Int() > 0
+		tradeTax.hasPercentInXML = att.Eval("count(ram:RateApplicablePercent)").Int() > 0
 		tradeTax.TypeCode = att.Eval("ram:TypeCode").String()
 		tradeTax.ExemptionReason = att.Eval("ram:ExemptionReason").String()
 		tradeTax.ExemptionReasonCode = att.Eval("ram:ExemptionReasonCode").String()
@@ -501,6 +536,7 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 
 	// BT-110 and BT-111: Parse TaxTotalAmount by matching currencyID (not position)
 	// EN 16931 specifies which currency each total must be in, regardless of XML order
+	taxTotalIndex := 0
 	for taxTotal := range summation.Each("ram:TaxTotalAmount") {
 		inv.checkContext()
 		currency := taxTotal.Eval("@currencyID").String()
@@ -508,20 +544,23 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 		if err != nil {
 			return fmt.Errorf("invalid TaxTotalAmount with currency %s: %w", currency, err)
 		}
+		inv.taxTotalsXML = append(inv.taxTotalsXML, taxTotalXML{currency: currency, amount: amount})
 
-		// BT-110: Tax total in invoice currency (must match BT-5)
-		switch {
-		case currency == inv.InvoiceCurrencyCode:
+		// The CII semantic mapping applies BT-110 rules to the first
+		// TaxTotalAmount regardless of currency, while a matching BT-6 also
+		// makes that element BT-111. One element can therefore satisfy both.
+		if taxTotalIndex == 0 {
 			inv.TaxTotalCurrency = currency
 			inv.TaxTotal = amount
-		case inv.TaxCurrencyCode != "" && currency == inv.TaxCurrencyCode:
-			// BT-111: Tax total in accounting currency (must match BT-6)
+		}
+		if inv.TaxCurrencyCode != "" && inv.TaxCurrencyCode != inv.InvoiceCurrencyCode && currency == inv.TaxCurrencyCode {
 			inv.TaxTotalAccountingCurrency = currency
 			inv.TaxTotalAccounting = amount
-		default:
-			// Track unexpected TaxTotalAmount currencies for validation
+			inv.hasTaxTotalAccountingXML = true
+		} else if taxTotalIndex > 0 && currency != inv.InvoiceCurrencyCode {
 			inv.unexpectedTaxCurrencies = append(inv.unexpectedTaxCurrencies, currency)
 		}
+		taxTotalIndex++
 	}
 
 	inv.GrandTotal, err = getDecimal(summation, "ram:GrandTotalAmount")
@@ -529,6 +568,10 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 		return err
 	}
 	inv.TotalPrepaid, err = getDecimal(summation, "ram:TotalPrepaidAmount")
+	if err != nil {
+		return err
+	}
+	inv.RoundingAmount, err = getDecimal(summation, "ram:RoundingAmount")
 	if err != nil {
 		return err
 	}
@@ -575,11 +618,19 @@ func parseSpecifiedLineTradeAgreement(specifiedLineTradeAgreement *cxpath.Contex
 		return err
 	}
 	invoiceLine.BasisQuantityUnit = specifiedLineTradeAgreement.Eval("ram:NetPriceProductTradePrice/ram:BasisQuantity/@unitCode").String()
+	invoiceLine.hasNetBasisQuantityInXML = specifiedLineTradeAgreement.Eval("count(ram:NetPriceProductTradePrice/ram:BasisQuantity)").Int() > 0
+	invoiceLine.hasGrossBasisQuantityInXML = specifiedLineTradeAgreement.Eval("count(ram:GrossPriceProductTradePrice/ram:BasisQuantity)").Int() > 0
+	invoiceLine.grossBasisQuantity, err = getDecimal(specifiedLineTradeAgreement, "ram:GrossPriceProductTradePrice/ram:BasisQuantity")
+	if err != nil {
+		return err
+	}
+	invoiceLine.grossBasisQuantityUnit = specifiedLineTradeAgreement.Eval("ram:GrossPriceProductTradePrice/ram:BasisQuantity/@unitCode").String()
 
 	invoiceLine.GrossPrice, err = getDecimal(specifiedLineTradeAgreement, "ram:GrossPriceProductTradePrice/ram:ChargeAmount")
 	if err != nil {
 		return err
 	}
+	invoiceLine.hasGrossPriceInXML = specifiedLineTradeAgreement.Eval("count(ram:GrossPriceProductTradePrice/ram:ChargeAmount)").Int() > 0
 	// ZUGFeRD extended has unbound BT-147
 	for allowanceCharge := range specifiedLineTradeAgreement.Each("ram:GrossPriceProductTradePrice/ram:AppliedTradeAllowanceCharge") {
 		basisAmount, err := getDecimal(allowanceCharge, "ram:BasisAmount")
@@ -609,10 +660,19 @@ func parseSpecifiedLineTradeAgreement(specifiedLineTradeAgreement *cxpath.Contex
 			CategoryTradeTaxType:                  allowanceCharge.Eval("ram:CategoryTradeTax/ram:TypeCode").String(),
 			CategoryTradeTaxCategoryCode:          allowanceCharge.Eval("ram:CategoryTradeTax/ram:CategoryCode").String(),
 			CategoryTradeTaxRateApplicablePercent: categoryTaxRate,
+			hasActualAmountInXML:                  allowanceCharge.Eval("count(ram:ActualAmount)").Int() > 0,
+			hasBasisAmountInXML:                   allowanceCharge.Eval("count(ram:BasisAmount)").Int() > 0,
+			hasPercentInXML:                       allowanceCharge.Eval("count(ram:CalculationPercent)").Int() > 0,
+			hasIndicatorInXML:                     allowanceCharge.Eval("count(ram:ChargeIndicator/udt:Indicator)").Int() > 0,
+			indicatorValidXML:                     isXMLBoolean(allowanceCharge.Eval("ram:ChargeIndicator/udt:Indicator").String()),
 		}
 		invoiceLine.AppliedTradeAllowanceCharge = append(invoiceLine.AppliedTradeAllowanceCharge, allowanceCharge)
 	}
 	return nil
+}
+
+func isXMLBoolean(value string) bool {
+	return value == "true" || value == "false"
 }
 
 func parseSpecifiedTradeProduct(specifiedTradeProduct *cxpath.Context, invoiceLine *InvoiceLine) {
@@ -632,9 +692,10 @@ func parseSpecifiedTradeProduct(specifiedTradeProduct *cxpath.Context, invoiceLi
 	}
 	for itm := range specifiedTradeProduct.Each("ram:DesignatedProductClassification") {
 		ch := Classification{
-			ClassCode:     itm.Eval("ram:ClassCode").String(),
-			ListID:        itm.Eval("ram:ClassCode/@listID").String(),
-			ListVersionID: itm.Eval("ram:ClassCode/@listVersionID").String(),
+			ClassCode:      itm.Eval("ram:ClassCode").String(),
+			ListID:         itm.Eval("ram:ClassCode/@listID").String(),
+			ListVersionID:  itm.Eval("ram:ClassCode/@listVersionID").String(),
+			hasListIDInXML: itm.Eval("count(ram:ClassCode/@listID)").Int() > 0,
 		}
 		invoiceLine.ProductClassification = append(invoiceLine.ProductClassification, ch)
 	}

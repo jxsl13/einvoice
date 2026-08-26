@@ -326,6 +326,30 @@ func TestBRCO17_VATCalculation(t *testing.T) {
 	}
 }
 
+func TestVATAmountWithinOfficialTolerance(t *testing.T) {
+	t.Parallel()
+
+	expected := decimal.NewFromInt(19)
+	for _, test := range []struct {
+		name   string
+		actual string
+		want   bool
+	}{
+		{name: "exact", actual: "19", want: true},
+		{name: "positive inside boundary", actual: "19.99", want: true},
+		{name: "negative sign is ignored", actual: "-18.01", want: true},
+		{name: "boundary is strict", actual: "20", want: false},
+		{name: "outside", actual: "20.01", want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			actual := decimal.RequireFromString(test.actual)
+			if got := vatAmountWithinOfficialTolerance(actual, expected); got != test.want {
+				t.Fatalf("vatAmountWithinOfficialTolerance(%s, %s) = %v, want %v", actual, expected, got, test.want)
+			}
+		})
+	}
+}
+
 // TestBRCO18_AtLeastOneVATBreakdown tests BR-CO-18: Invoice should contain at least one VAT breakdown
 func TestBRCO18_AtLeastOneVATBreakdown(t *testing.T) {
 	inv := Invoice{
@@ -1207,12 +1231,13 @@ func TestBR52_SupportingDocumentMustHaveReference(t *testing.T) {
 // TestBR53_TaxAccountingCurrencyRequiresTotalVAT tests BR-53
 func TestBR53_TaxAccountingCurrencyRequiresTotalVAT(t *testing.T) {
 	inv := Invoice{
+		isParsed: true,
 		GuidelineSpecifiedDocumentContextParameter: SpecFacturXBasic,
 		InvoiceNumber:       "TEST-BR53",
 		InvoiceTypeCode:     380,
 		InvoiceDate:         time.Now(),
 		InvoiceCurrencyCode: "EUR",
-		TaxCurrencyCode:     "USD", // Specified but TaxTotalAccounting is zero
+		TaxCurrencyCode:     "USD", // Specified but BT-111 is absent.
 		LineTotal:           decimal.NewFromInt(100),
 		TaxBasisTotal:       decimal.NewFromInt(100),
 		GrandTotal:          decimal.NewFromInt(119),
@@ -1260,7 +1285,15 @@ func TestBR53_TaxAccountingCurrencyRequiresTotalVAT(t *testing.T) {
 	}
 
 	if !br53Found {
-		t.Error("Expected BR-53 violation when tax currency is specified but tax total VAT is zero")
+		t.Error("Expected BR-53 violation when tax currency is specified but BT-111 is absent")
+	}
+
+	inv.hasTaxTotalAccountingXML = true
+	_ = inv.Validate()
+	for _, violation := range inv.violations {
+		if violation.Rule.Code == "BR-53" {
+			t.Error("BR-53 must accept a present BT-111 amount whose value is zero")
+		}
 	}
 }
 
@@ -1976,6 +2009,18 @@ func TestBRCO9_VATIdentifierPrefix(t *testing.T) {
 			taxRepVAT:     "",
 			wantViolation: false,
 			checkField:    "buyer",
+		},
+		{
+			name:          "valid: Kosovo temporary 1A prefix",
+			sellerVAT:     "1A123456789",
+			wantViolation: false,
+			checkField:    "seller",
+		},
+		{
+			name:          "invalid: unassigned uppercase prefix",
+			sellerVAT:     "ZZ123456789",
+			wantViolation: true,
+			checkField:    "seller",
 		},
 		{
 			name:          "invalid: seller starts with digit",

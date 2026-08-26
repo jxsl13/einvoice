@@ -459,7 +459,17 @@ func TestValidatePEPPOL_R120_LineNetAmountCalculation(t *testing.T) {
 			var valErr *ValidationError
 			hasR120Violation := false
 			if errors.As(err, &valErr) {
-				hasR120Violation = valErr.HasRule(rules.PEPPOLEN16931R120)
+				for _, warning := range valErr.Warnings() {
+					if warning.Rule.Code == rules.PEPPOLEN16931R120.Code {
+						hasR120Violation = true
+					}
+				}
+			} else {
+				for _, warning := range inv.Warnings() {
+					if warning.Rule.Code == rules.PEPPOLEN16931R120.Code {
+						hasR120Violation = true
+					}
+				}
 			}
 
 			if tt.wantViolation && !hasR120Violation {

@@ -40,6 +40,15 @@ func (inv *Invoice) validateVATNotSubject() {
 			}
 		}
 	}
+	if !hasNotSubjectToVAT {
+		for i := range inv.TradeTaxes {
+			inv.checkContext()
+			if inv.TradeTaxes[i].CategoryCode == "O" {
+				hasNotSubjectToVAT = true
+				break
+			}
+		}
+	}
 
 	// Only validate if invoice uses category O
 	if !hasNotSubjectToVAT {

@@ -17,6 +17,8 @@ const (
 	xincludeNamespace = "http://www.w3.org/2001/XInclude"
 	truncationRuleID  = "VALIDATOR-FINDINGS-TRUNCATED"
 	truncationMsgCode = "validator.findings_truncated"
+	schemaRuleID      = "XSD"
+	schemaMsgCode     = "schema.invalid"
 )
 
 type contextReader struct {
@@ -140,10 +142,15 @@ func inspectXML(ctx context.Context, data []byte, maxDepth int) (Syntax, error) 
 		case xml.Directive:
 			return "", failure(ErrorMalformedInput, "", nil)
 		case xml.ProcInst:
-			if value.Target != "xml" || seenDeclaration || seenRoot {
-				return "", failure(ErrorMalformedInput, "", nil)
+			// Processing instructions are part of well-formed XML and carry no
+			// entity-expansion behavior in encoding/xml. Keep rejecting malformed
+			// or duplicate XML declarations, but safely ignore other targets.
+			if value.Target == "xml" {
+				if seenDeclaration || seenRoot {
+					return "", failure(ErrorMalformedInput, "", nil)
+				}
+				seenDeclaration = true
 			}
-			seenDeclaration = true
 			textBytes = 0
 		default:
 			textBytes = 0
@@ -154,6 +161,48 @@ func inspectXML(ctx context.Context, data []byte, maxDepth int) (Syntax, error) 
 		return "", failure(ErrorMalformedInput, "", nil)
 	}
 	return syntax, nil
+}
+
+func hasForbiddenEmptyElement(ctx context.Context, data []byte, syntax Syntax) (bool, error) {
+	type state struct {
+		name       xml.Name
+		hasElement bool
+		hasText    bool
+	}
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	decoder.Strict = true
+	stack := make([]state, 0, HardMaxDepth)
+	for {
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		token, err := decoder.Token()
+		if err == io.EOF {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		switch value := token.(type) {
+		case xml.StartElement:
+			if len(stack) > 0 {
+				stack[len(stack)-1].hasElement = true
+			}
+			stack = append(stack, state{name: value.Name})
+		case xml.CharData:
+			if len(stack) > 0 && strings.TrimSpace(string(value)) != "" {
+				stack[len(stack)-1].hasText = true
+			}
+		case xml.EndElement:
+			current := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			excludedCIIContainer := syntax == SyntaxCII && current.name.Space == ciiReusableNS &&
+				current.name.Local == "ApplicableHeaderTradeDelivery"
+			if !current.hasElement && !current.hasText && !excludedCIIContainer {
+				return true, nil
+			}
+		}
+	}
 }
 
 func rootSyntax(name xml.Name) (Syntax, error) {
