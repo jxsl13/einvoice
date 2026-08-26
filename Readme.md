@@ -10,7 +10,8 @@ This is the public Hugo Studio fork of
 [speedata/einvoice](https://github.com/speedata/einvoice). It retains the
 upstream history and BSD-3-Clause attribution while using the independent Go
 module path `github.com/jxsl13/einvoice`. See [UPSTREAM.md](UPSTREAM.md) for the
-sync and release policy.
+sync and release policy and [CONFORMANCE.md](CONFORMANCE.md) for the public
+validation baseline and release gates.
 
 No release is authoritative for German fiscal issuance until its published
 conformance report satisfies the rule-coverage and KoSIT parity gates. Java is
