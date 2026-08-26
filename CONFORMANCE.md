@@ -74,6 +74,14 @@ roadmap. It does not satisfy rule inventory, witness, mutation, differential
 parity, false-accept, provenance, supply-chain, or adviser-acceptance gates and
 does not change the module's fiscal-conformance status.
 
+The pinned XRechnung 3.0.2 overlay inventory is now generated directly from
+the checksum-verified Schematron 2.5.0 archive. It records 71 CII predicates
+and 76 UBL predicates, including their standard, PEPPOL, extension, and CVD
+capability groups and immutable member/predicate digests. CI regenerates and
+byte-compares this inventory without Java. Capability flags intentionally
+remain false until executable mappings and all remaining production gates are
+complete.
+
 ## Implementation sequence
 
 1. Add a bounded context-aware validation API and deterministic typed findings.

@@ -11,6 +11,37 @@ permissions:
   contents: read
 
 jobs:
+  rule-inventory:
+    name: Pinned rule inventory
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: '1.25'
+        cache: true
+
+    - name: Download checksum-pinned Schematron source archive
+      shell: bash
+      run: |
+        set -euo pipefail
+        archive="${RUNNER_TEMP}/xrechnung-schematron.zip"
+        url="$(jq -er '.dependencies.xrechnungSchematron.url' .github/dependencies/parity.json)"
+        curl --fail --location --proto '=https' --tlsv1.2 --output "${archive}" "${url}"
+
+    - name: Verify deterministic rule inventory
+      shell: bash
+      run: |
+        set -euo pipefail
+        archive="${RUNNER_TEMP}/xrechnung-schematron.zip"
+        expected="$(jq -er '.dependencies.xrechnungSchematron.sha256' .github/dependencies/parity.json)"
+        printf '%s  %s\n' "${expected}" "${archive}" | sha256sum --check --strict
+        go run ./cmd/genruleinventory -archive "${archive}" -verify
+
   test:
     name: Test
     runs-on: ${{ matrix.os }}

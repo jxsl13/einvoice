@@ -1,0 +1,1315 @@
+{
+  "schemaVersion": 1,
+  "profile": "XRechnung",
+  "profileVersion": "3.0.2",
+  "ruleVersion": "v2.5.0",
+  "phase": "xrechnung-model",
+  "archive": {
+    "repository": "itplr-kosit/xrechnung-schematron",
+    "url": "https://github.com/itplr-kosit/xrechnung-schematron/releases/download/v2.5.0/xrechnung-3.0.2-schematron-2.5.0.zip",
+    "version": "v2.5.0",
+    "sha256": "a0f3d82737759bee8591c298ff24983a8f1c667f85e45a34863c75a242bc6f43",
+    "license": "Apache-2.0"
+  },
+  "capabilities": [
+    {
+      "group": "infrastructure",
+      "supported": false,
+      "reason": "inventory metadata only"
+    },
+    {
+      "group": "standard",
+      "supported": false,
+      "reason": "runtime mapping and witness gates pending"
+    },
+    {
+      "group": "peppol",
+      "supported": false,
+      "reason": "runtime mapping and witness gates pending"
+    },
+    {
+      "group": "extension",
+      "supported": false,
+      "reason": "profile is outside the initial release scope"
+    },
+    {
+      "group": "cvd",
+      "supported": false,
+      "reason": "profile is outside the initial release scope"
+    }
+  ],
+  "syntaxes": [
+    {
+      "syntax": "cii",
+      "source": {
+        "path": "cii/XRechnung-CII-validation.sch",
+        "sha256": "bd16cb6c4b85ec11e2b5f420f03126ee4b3bfc260bf279d1243503073fdc4784"
+      },
+      "queryBinding": "xslt2",
+      "patterns": [
+        {
+          "id": "variable-pattern",
+          "group": "infrastructure"
+        },
+        {
+          "id": "cii-pattern",
+          "group": "standard",
+          "rules": [
+            {
+              "id": "BR-DE-30",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice",
+              "test": "(($BT-89-path or $BT-91-path) and $BT-90-path) or $BG-19-not-existing",
+              "digest": "75e25a6f1ec20d43225a74658292841332db2b3a4cdfb9fe4dbb07c18ae2834a"
+            },
+            {
+              "id": "BR-DE-31",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice",
+              "test": "(($BT-89-path or $BT-90-path) and $BT-91-path) or $BG-19-not-existing",
+              "digest": "be9559e8a48305da0422905600954577030767b33bd6c4001b85d119168ebf3d"
+            },
+            {
+              "id": "BR-DE-1",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice",
+              "test": "rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans",
+              "digest": "ce83c8cc763fcaccfb2468375ca8a7440902bf4a4b418259ac52f68783f339fb"
+            },
+            {
+              "id": "BR-DE-15",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice",
+              "test": "rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerReference[boolean(normalize-space(.))]",
+              "digest": "516b1fe9fa6bf3d9447da4d9bcb8199e99fee70654586df1e2c7a20948e37828"
+            },
+            {
+              "id": "BR-DE-16",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice",
+              "test": "not((rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:TypeCode = 'VAT' and rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:CategoryCode = ('S', 'Z', 'E', 'AE', 'K', 'G', 'L', 'M')) or (rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:CategoryTradeTax = 'VAT' and rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge/ram:CategoryTradeTax/ram:CategoryCode = ('S', 'Z', 'E', 'AE', 'K', 'G', 'L', 'M')) or (rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:TypeCode = 'VAT' and rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:CategoryCode = ('S', 'Z', 'E', 'AE', 'K', 'G', 'L', 'M'))) or ((rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedTaxRegistration/ram:ID[normalize-space(@schemeID)='VA' or normalize-space(@schemeID)='FC'][boolean(normalize-space(.))], rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTaxRepresentativeTradeParty))",
+              "digest": "10336e44b3b5b9a5bd450a6681ad4b7639c22c6bc950309047ebd8d0f47e6b6c"
+            },
+            {
+              "id": "BR-DE-17",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/rsm:CrossIndustryInvoice",
+              "test": "normalize-space(rsm:ExchangedDocument/ram:TypeCode) = ('326', '380', '384', '389', '381', '875', '876', '877')",
+              "digest": "36e0bfffea48115a4876ad6ff5ee774a078285f94f9c8acb2a688885c6e3a79c"
+            },
+            {
+              "id": "BR-DE-18",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice",
+              "test": "every $line in rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:Description[1]/tokenize(. , '(\\r?\\n)')[starts-with( normalize-space(.) , '#')] satisfies matches ( normalize-space ($line), $XR-SKONTO-REGEX ) and matches( rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:Description[1]/tokenize(. , '#.+#')[last()], '^\\s*\\n' )",
+              "digest": "cc67978defd05d9330e8134cb6d84a002f2ec85dfe4615a23a616376a7e94b90"
+            },
+            {
+              "id": "BR-DE-22",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice",
+              "test": "count(//ram:AdditionalReferencedDocument) = count(//ram:AdditionalReferencedDocument[not(./ram:AttachmentBinaryObject/@filename = preceding-sibling::ram:AdditionalReferencedDocument/ram:AttachmentBinaryObject/@filename)])",
+              "digest": "9950e2bb417b577fda9cde9d67eb7803fccc21914932e811c884642fa5f27c9a"
+            },
+            {
+              "id": "BR-DE-26",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/rsm:CrossIndustryInvoice",
+              "test": "not(normalize-space(rsm:ExchangedDocument/ram:TypeCode) = '384') or (rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:InvoiceReferencedDocument)",
+              "digest": "ed690f2a4e4020402b652c4e1e050593f701a40803a0b008428cf96871a772ce"
+            },
+            {
+              "id": "BR-DE-21",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/rsm:CrossIndustryInvoice/rsm:ExchangedDocumentContext",
+              "test": "ram:GuidelineSpecifiedDocumentContextParameter/ram:ID = $XR-CIUS-ID or ram:GuidelineSpecifiedDocumentContextParameter/ram:ID = $XR-EXTENSION-ID or ram:GuidelineSpecifiedDocumentContextParameter/ram:ID = $XR-CVD-ID",
+              "digest": "5a9eba436e13f65c28895643a764403def13e3f9d376cb5d8aec358247054adc"
+            },
+            {
+              "id": "BR-DE-2",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty",
+              "test": "ram:DefinedTradeContact",
+              "digest": "789be1a5a14b2a22c50724b6c6ffd87b9789a37054b6a05254470f65b4c62f52"
+            },
+            {
+              "id": "BR-DE-3",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress",
+              "test": "ram:CityName[boolean(normalize-space(.))]",
+              "digest": "8d4a24e21dbad253e383799bed752a75215937e192c797aee2f9bf74eec22fd4"
+            },
+            {
+              "id": "BR-DE-4",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:PostalTradeAddress",
+              "test": "ram:PostcodeCode[boolean(normalize-space(.))]",
+              "digest": "08cf4df98a3a06076643ac0d48721c759c91ce2c111fe3e8986c578f4e1c61bc"
+            },
+            {
+              "id": "BR-DE-5",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact",
+              "test": "(ram:PersonName,ram:DepartmentName)[boolean(normalize-space(.))]",
+              "digest": "4194d42e087a81cbf912f9fa9fda7523c18e7e81be68a0e76cec250fc4a7e52e"
+            },
+            {
+              "id": "BR-DE-6",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact",
+              "test": "ram:TelephoneUniversalCommunication/ram:CompleteNumber[boolean(normalize-space(.))]",
+              "digest": "1f3c0150b8657127fe29653d1fb7285f5582a24f3d784a5c5d68e012663a7eb5"
+            },
+            {
+              "id": "BR-DE-7",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact",
+              "test": "ram:EmailURIUniversalCommunication/ram:URIID[boolean(normalize-space(.))]",
+              "digest": "13170be26d0e19d7d2fcbe9b0da99b07451ed40f08fa366d90e2f8d08f56a310"
+            },
+            {
+              "id": "BR-DE-27",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact",
+              "test": "matches(normalize-space(ram:TelephoneUniversalCommunication/ram:CompleteNumber), $XR-TELEPHONE-REGEX)",
+              "digest": "c59758d00a2249d689c2ef5dc971b8205be4fbc8bf87bbb360855a908512d662"
+            },
+            {
+              "id": "BR-DE-28",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:DefinedTradeContact",
+              "test": "matches(normalize-space(ram:EmailURIUniversalCommunication/ram:URIID), $XR-EMAIL-REGEX)",
+              "digest": "8c3e6602621eba1bf75e3412ec3ff88c7b795e219e88c6678786504f10f81f2d"
+            },
+            {
+              "id": "BR-DE-8",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress",
+              "test": "ram:CityName[boolean(normalize-space(.))]",
+              "digest": "144f38101f17eb6202796868a343228936d4e861c111c8fae3dac31980b551fc"
+            },
+            {
+              "id": "BR-DE-9",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty/ram:PostalTradeAddress",
+              "test": "ram:PostcodeCode[boolean(normalize-space(.))]",
+              "digest": "f9fdb47a3c266bc3b7b7b4e58c31b2ba4ddc11856ce525425876f98db0095e0d"
+            },
+            {
+              "id": "BR-TMP-2",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument[ram:TypeCode = '916']",
+              "test": "not(exists(ram:URIID)) or (matches(ram:URIID, $XR-URL-REGEX))",
+              "digest": "41fed37aab50114bab840f826e57df80ac2759e3bc0d0bbcefcd13f2adb644f0"
+            },
+            {
+              "id": "BR-DE-10",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress",
+              "test": "ram:CityName[boolean(normalize-space(.))]",
+              "digest": "3f2b1f6481c21663acde9e44d6925a824942a8860a34ec43f25f8dc72758e85f"
+            },
+            {
+              "id": "BR-DE-11",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress",
+              "test": "ram:PostcodeCode[boolean(normalize-space(.))]",
+              "digest": "077fef90a183c1acdd2194a01d394cd6e586f758711cdf7b8addcd77199922ab"
+            },
+            {
+              "id": "BR-DE-19",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans[normalize-space(ram:TypeCode) = ('30','58')]",
+              "test": "not(normalize-space(ram:TypeCode) = '58') or matches(normalize-space(replace(ram:PayeePartyCreditorFinancialAccount/ram:IBANID, '([ \\n\\r\\t\\s])', '')), '^[A-Z]{2}[0-9]{2}[a-zA-Z0-9]{0,30}$') and xs:integer(string-join(for $cp in string-to-codepoints(concat(substring(normalize-space(replace(ram:PayeePartyCreditorFinancialAccount/ram:IBANID, '([ \\n\\r\\t\\s])', '')),5),upper-case(substring(normalize-space(replace(ram:PayeePartyCreditorFinancialAccount/ram:IBANID, '([ \\n\\r\\t\\s])', '')),1,2)),substring(normalize-space(replace(ram:PayeePartyCreditorFinancialAccount/ram:IBANID, '([ \\n\\r\\t\\s])', '')),3,2))) return (if($cp \u003e 64) then string($cp - 55) else string($cp - 48)),'')) mod 97 = 1",
+              "digest": "005f6c88e03f19e4d91ff21d86de423a29f689ddc3b2313f2864ee7237742113"
+            },
+            {
+              "id": "BR-DE-23-a",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans[normalize-space(ram:TypeCode) = ('30','58')]",
+              "test": "ram:PayeePartyCreditorFinancialAccount",
+              "digest": "a6fc44c77c69422ad23dccf30580de1bcef85e0d575147529d2cfc13dba2618a"
+            },
+            {
+              "id": "BR-DE-23-b",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans[normalize-space(ram:TypeCode) = ('30','58')]",
+              "test": "not(ram:ApplicableTradeSettlementFinancialCard) and not(/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:DirectDebitMandateID or /rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:CreditorReferenceID or ram:PayerPartyDebtorFinancialAccount/ram:IBANID)",
+              "digest": "f62eed4102f54e73ab6b17b58473b7697852be537a131303e54c19d4d2dd6da9"
+            },
+            {
+              "id": "BR-DE-24-a",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans[normalize-space(ram:TypeCode) = ('48','54','55')]",
+              "test": "ram:ApplicableTradeSettlementFinancialCard",
+              "digest": "46dfa47bd7f8f091242e270c3cde3123b97aeda14b583715220dfaf3bf91d8f4"
+            },
+            {
+              "id": "BR-DE-24-b",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans[normalize-space(ram:TypeCode) = ('48','54','55')]",
+              "test": "not(ram:PayeePartyCreditorFinancialAccount) and not(/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:DirectDebitMandateID or /rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:CreditorReferenceID or ram:PayerPartyDebtorFinancialAccount/ram:IBANID)",
+              "digest": "9dc77b6055b8e7a8e5d1d1383a8d3c27c41925e9c474c446011d482191390370"
+            },
+            {
+              "id": "BR-DE-20",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans[normalize-space(ram:TypeCode) = '59']",
+              "test": "not(normalize-space(ram:TypeCode) = '59') or matches(normalize-space(replace(ram:PayerPartyDebtorFinancialAccount/ram:IBANID, '([ \\n\\r\\t\\s])', '')), '^[A-Z]{2}[0-9]{2}[a-zA-Z0-9]{0,30}$') and xs:decimal(string-join(for $cp in string-to-codepoints(concat(substring(normalize-space(replace(ram:PayerPartyDebtorFinancialAccount/ram:IBANID, '([ \\n\\r\\t\\s])', '')),5),upper-case(substring(normalize-space(replace(ram:PayerPartyDebtorFinancialAccount/ram:IBANID, '([ \\n\\r\\t\\s])', '')),1,2)),substring(normalize-space(replace(ram:PayerPartyDebtorFinancialAccount/ram:IBANID, '([ \\n\\r\\t\\s])', '')),3,2))) return (if($cp \u003e 64) then string($cp - 55) else string($cp - 48)),'')) mod 97 = 1",
+              "digest": "ff8667914545e7659e4d937238f62d7db86314a7caa1d9626ced6924a809aa5b"
+            },
+            {
+              "id": "BR-DE-25-a",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans[normalize-space(ram:TypeCode) = '59']",
+              "test": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradePaymentTerms/ram:DirectDebitMandateID or /rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:CreditorReferenceID or ram:PayerPartyDebtorFinancialAccount/ram:IBANID",
+              "digest": "897a6fa71eda2498ad98c3dc95f4470d01131438c15d879ee363d0071f555403"
+            },
+            {
+              "id": "BR-DE-25-b",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans[normalize-space(ram:TypeCode) = '59']",
+              "test": "not(ram:PayeePartyCreditorFinancialAccount) and not(ram:PayeeSpecifiedCreditorFinancialInstitution) and not(ram:PayerSpecifiedDebtorFinancialInstitution) and not(ram:ApplicableTradeSettlementFinancialCard)",
+              "digest": "3a2356d98bf417a2882fdc55c0bc3759d38b8149ca6ebf38decb3815170a67bc"
+            },
+            {
+              "id": "BR-DE-14",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax",
+              "test": "ram:RateApplicablePercent[boolean(normalize-space(.))]",
+              "digest": "326b9daa07575e6e92ac059334d850c81b738f38ea5d16889e325614c6bd2637"
+            },
+            {
+              "id": "BR-DE-TMP-32",
+              "kind": "assert",
+              "severity": "information",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction",
+              "test": "ram:ApplicableHeaderTradeDelivery/ram:ActualDeliverySupplyChainEvent/ram:OccurrenceDateTime or ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod or (every $line in ram:IncludedSupplyChainTradeLineItem satisfies $line/ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod)",
+              "digest": "606b8ee366257f6d6cb7e185726f16dada13c438db77b0a5774b8cddc88be842"
+            },
+            {
+              "id": "BR-TMP-3",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem",
+              "test": "not(ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:BasisQuantity and ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:BasisQuantity) or (ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:BasisQuantity = ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:BasisQuantity and (not(ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:BasisQuantity/@unitCode and ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:BasisQuantity/@unitCode) or ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:BasisQuantity/@unitCode = ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:BasisQuantity/@unitCode))",
+              "digest": "3b5103e6cd8ce88b706fe7f05ed72ddf288a229f86013ea7ac9331ea9bf9fe3c"
+            }
+          ]
+        },
+        {
+          "id": "cii-extension-pattern",
+          "group": "extension",
+          "rules": [
+            {
+              "id": "BR-DEX-15",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:AssociatedDocumentLineDocument[$isExtension]",
+              "test": "not(exists(//ram:ParentLineID))",
+              "digest": "ca23949ca0978c1423040f26bd173c55e51440f9e26e04a3ba39047d59021bd0"
+            },
+            {
+              "id": "BR-DEX-04",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "//ram:GlobalID[@schemeID and $isExtension][not(ancestor::ram:SpecifiedTradeProduct) and not(ancestor::ram:ShipToTradeParty)]",
+              "test": "((not(contains(normalize-space(@schemeID), ' ')) and contains($ISO-6523-ICD-EXT-CODES, concat(' ', normalize-space(@schemeID), ' '))))",
+              "digest": "ad758a216cdc792dc5976191fd6d05ea1ed40876fea5ea670e47848f64689a12"
+            },
+            {
+              "id": "BR-DEX-05",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:ID[@schemeID and $isExtension][not(ancestor::ram:SpecifiedTaxRegistration)]",
+              "test": "((not(contains(normalize-space(@schemeID), ' ')) and contains($ISO-6523-ICD-EXT-CODES, concat(' ', normalize-space(@schemeID), ' '))))",
+              "digest": "389449353c9a11dc500658e51509f8f41398b915e8cc65f03bfe36ed7c25609c"
+            },
+            {
+              "id": "BR-DEX-06",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:SpecifiedTradeProduct/ram:GlobalID[@schemeID and $isExtension]",
+              "test": "((not(contains(normalize-space(@schemeID), ' ')) and contains($ISO-6523-ICD-EXT-CODES, concat(' ', normalize-space(@schemeID), ' '))))",
+              "digest": "4f0129588fa5d0b1cd38fb4fd1a7684396e24566d22261e5a0c04f8ebaf0083b"
+            },
+            {
+              "id": "BR-DEX-07",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:URIUniversalCommunication/ram:URIID[@schemeID and $isExtension]",
+              "test": "((not(contains(normalize-space(@schemeID), ' ')) and contains($CEF-EAS-EXT-CODES, concat(' ', normalize-space(@schemeID), ' '))))",
+              "digest": "7ddcb5fd17ca3588a4451709c9650419d5ade2a8a9bd838bf64fc72596bc87d8"
+            },
+            {
+              "id": "BR-DEX-08",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:GlobalID[@schemeID and $isExtension]",
+              "test": "((not(contains(normalize-space(@schemeID), ' ')) and contains($ISO-6523-ICD-EXT-CODES, concat(' ', normalize-space(@schemeID), ' '))))",
+              "digest": "6c595b68204c158dff56b9cc055296297fa8639f4a9f51809af625524cb26aad"
+            },
+            {
+              "id": "BR-DEX-01",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:AttachmentBinaryObject[$isExtension]",
+              "test": ".[@mimeCode = 'application/pdf' or @mimeCode = 'image/png' or @mimeCode = 'image/jpeg' or @mimeCode = 'text/csv' or @mimeCode = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or @mimeCode = 'application/vnd.oasis.opendocument.spreadsheet' or @mimeCode = 'application/xml']",
+              "digest": "f9a851abaec551002c3314f013f0a7e91b24ebdaf40a8a10faddfdb4a0665d4e"
+            }
+          ]
+        },
+        {
+          "id": "cii-cvd-pattern",
+          "group": "cvd",
+          "rules": [
+            {
+              "id": "BR-DE-CVD-03",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice[$isCVD]/rsm:SupplyChainTradeTransaction",
+              "test": "ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct[ram:DesignatedProductClassification/ram:ClassCode/@listID = 'CVD' and ram:ApplicableProductCharacteristic/ram:Description = 'cva']",
+              "digest": "6805349f023bb11a215acbb1c30ed341ef33dfeaa0cc3246b1bdff0918b79fe4"
+            },
+            {
+              "id": "BR-DE-CVD-06-b",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice[$isCVD]/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct",
+              "test": "not(ram:ApplicableProductCharacteristic/ram:Description = 'cva') or count(ram:DesignatedProductClassification/ram:ClassCode[@listID = 'CVD']) = 1",
+              "digest": "616cda68680faab344f77fdbf72b1d28e832523802bcb4cdca51b7a584ee26c2"
+            },
+            {
+              "id": "BR-DE-CVD-06-a",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice[$isCVD]/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct",
+              "test": "not(ram:DesignatedProductClassification/ram:ClassCode/@listID = 'CVD') or count(ram:ApplicableProductCharacteristic[ram:Description = 'cva']) = 1",
+              "digest": "232db2ddcb5dbc77184368bb21d666bfb2ae8ca2f588c0996266f683ae979166"
+            },
+            {
+              "id": "BR-TMP-CVD-01",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice[$isCVD]/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:DesignatedProductClassification/ram:ClassCode",
+              "test": "((not(contains(normalize-space(@listID), ' ')) and contains($UNTDID-7143-CVD-CODES, concat(' ', normalize-space(@listID), ' '))))",
+              "digest": "b0110c4a7559a5d1817d019c05b3827965a10eac8cfe6873ec3183897f482613"
+            },
+            {
+              "id": "BR-DE-CVD-04",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice[$isCVD]/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:DesignatedProductClassification/ram:ClassCode",
+              "test": "not(normalize-space(@listID) = 'CVD') or normalize-space(.) = $CVD-VEHICLE-CATEGORY",
+              "digest": "f1e457e03889f7d4b64c21f48d78f50ca78fdc1b5af23e70e56fb379d867e33a"
+            },
+            {
+              "id": "BR-DE-CVD-05",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice[$isCVD]/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedTradeProduct/ram:ApplicableProductCharacteristic[ram:Description = 'cva']",
+              "test": "normalize-space(ram:Value) = $CVA-CODES",
+              "digest": "a1724ef69b2a3d206eb41b5789aaa05460c52f764cbc91ea66f64a3dad781a3a"
+            },
+            {
+              "id": "BR-DE-CVD-01",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice[$isCVD]/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement",
+              "test": "ram:ContractReferencedDocument/ram:IssuerAssignedID[boolean(normalize-space(.))]",
+              "digest": "80f35e6d0f505074c08d49e49643d4310938d0ae67e7df36f772c574db846565"
+            },
+            {
+              "id": "BR-DE-CVD-02",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/rsm:CrossIndustryInvoice[$isCVD]/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement",
+              "test": "ram:AdditionalReferencedDocument[normalize-space(ram:TypeCode) = '50' and normalize-space(ram:IssuerAssignedID)]",
+              "digest": "186c32763ccc714f788745fc5fcc09c2b0ba60939eb0bc8d320fa91efc983ee2"
+            }
+          ]
+        },
+        {
+          "id": "peppol-cii-pattern-0-a",
+          "group": "peppol",
+          "rules": [
+            {
+              "id": "PEPPOL-EN16931-R008",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "//*[not(name() = 'ram:ApplicableHeaderTradeDelivery') and not(*) and not(normalize-space())]",
+              "test": "false()",
+              "digest": "083c66eb36b81d0064a73e36a49d0ca09a28bdc93c32bd2c199b4bfb2e804ee2"
+            }
+          ]
+        },
+        {
+          "id": "peppol-cii-pattern-0-b",
+          "group": "peppol",
+          "rules": [
+            {
+              "id": "PEPPOL-EN16931-R044",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice",
+              "test": "not(ram:AppliedTradeAllowanceCharge/ram:ActualAmount) or ram:AppliedTradeAllowanceCharge/ram:ChargeIndicator/udt:Indicator = 'false'",
+              "digest": "286ff235e30a40ff54c33184e705cad78f15063cc13346699faf148e4d434b43"
+            },
+            {
+              "id": "PEPPOL-EN16931-R046",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice",
+              "test": "not(ram:ChargeAmount) or xs:decimal(../ram:NetPriceProductTradePrice/ram:ChargeAmount) = xs:decimal(ram:ChargeAmount) - u:decimalOrZero(ram:AppliedTradeAllowanceCharge/ram:ActualAmount[1])",
+              "digest": "f1dcc7e5046f8599d30625563a4fe8b116e60c07134829eeba70e079bae2a537"
+            }
+          ]
+        },
+        {
+          "id": "peppol-cii-pattern-1",
+          "group": "peppol",
+          "rules": [
+            {
+              "id": "PEPPOL-EN16931-R001",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "rsm:ExchangedDocumentContext",
+              "test": "ram:BusinessProcessSpecifiedDocumentContextParameter/ram:ID",
+              "digest": "430827b7f4dc2644c577137e5cbcabeb5c0311e16f16fd03010cfbf3f89a8783"
+            },
+            {
+              "id": "PEPPOL-EN16931-R005",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:ApplicableHeaderTradeSettlement",
+              "test": "not(ram:TaxCurrencyCode) or normalize-space(ram:TaxCurrencyCode/text()) != normalize-space(ram:InvoiceCurrencyCode/text())",
+              "digest": "07ad62ad5d61d17492e612f602e89ec4e844b782e9860e02a3aa0aa27693dd89"
+            },
+            {
+              "id": "PEPPOL-EN16931-R053",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:ApplicableHeaderTradeSettlement",
+              "test": "count(ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxTotalAmount[@currencyID = $documentCurrencyCode]) \u003c=1",
+              "digest": "f94754e037340bb7fb4186c45a2985c83fc5cb7b03782d004e1fce98d71acfd8"
+            },
+            {
+              "id": "PEPPOL-EN16931-R054",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:ApplicableHeaderTradeSettlement",
+              "test": "count(ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxTotalAmount[@currencyID != $documentCurrencyCode]) = (if (ram:TaxCurrencyCode) then 1 else 0)",
+              "digest": "206a51b6139760c11ce7bd460c7cad0bdb9300f46d1953301977792de31e7759"
+            },
+            {
+              "id": "PEPPOL-EN16931-R055",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:ApplicableHeaderTradeSettlement",
+              "test": "not(/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:TaxCurrencyCode and ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxTotalAmount[@currencyID = $documentCurrencyCode]) or (ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxTotalAmount[@currencyID = $taxCurrencyCode] \u003c 0 and ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxTotalAmount[@currencyID = $documentCurrencyCode] \u003c 0) or (ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxTotalAmount[@currencyID = $taxCurrencyCode] \u003e= 0 and ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:TaxTotalAmount[@currencyID = $documentCurrencyCode] \u003e= 0)",
+              "digest": "021d92c43f7613f7c7d8a09d3856f5cd1dff80feda982623fc4bd62dd22f472b"
+            },
+            {
+              "id": "PEPPOL-EN16931-R010",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:BuyerTradeParty",
+              "test": "ram:URIUniversalCommunication/ram:URIID",
+              "digest": "57f7837c1bb44c5b08a47ef658c45e5e3fa12ff9847bb95fb340f0108d4bb9d1"
+            },
+            {
+              "id": "PEPPOL-EN16931-R020",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:SellerTradeParty",
+              "test": "ram:URIUniversalCommunication/ram:URIID",
+              "digest": "9708e71c4ce3d1315b396a7ce22cbdbddde1bf42de8de3f874297413cc399140"
+            },
+            {
+              "id": "PEPPOL-EN16931-R041",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:SpecifiedTradeAllowanceCharge[ram:CalculationPercent and not(ram:BasisAmount)]",
+              "test": "false()",
+              "digest": "87df4193cb2b15bb54561c1c97b6cd895ab2d6283a3273779c1400ac173d843c"
+            },
+            {
+              "id": "PEPPOL-EN16931-R042",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:SpecifiedTradeAllowanceCharge[not(ram:CalculationPercent) and ram:BasisAmount]",
+              "test": "false()",
+              "digest": "5af79d7a8e62c4567fa8b8d48a2009ad467cdc9817f4fe09f69389da42492334"
+            },
+            {
+              "id": "PEPPOL-EN16931-R040",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:SpecifiedTradeAllowanceCharge",
+              "test": "not(ram:CalculationPercent and ram:BasisAmount) or u:slack(if (ram:ActualAmount) then ram:ActualAmount else 0, (xs:decimal(ram:BasisAmount) * xs:decimal(ram:CalculationPercent)) div 100, $slackValue)",
+              "digest": "cd172bbe8cc0d491afa52e81279b11942a10b22461cdc8fcd86e74e5ed924e9b"
+            },
+            {
+              "id": "PEPPOL-EN16931-R043-1",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:SpecifiedTradeAllowanceCharge",
+              "test": "normalize-space(ram:ChargeIndicator/udt:Indicator/text()) = 'true' or normalize-space(ram:ChargeIndicator/udt:Indicator/text()) = 'false'",
+              "digest": "11fda7a40335a1631bb9c3753feeaa6c3fbf121849fe717b71a87f8db4527a95"
+            },
+            {
+              "id": "PEPPOL-EN16931-R043-2",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:AppliedTradeAllowanceCharge",
+              "test": "normalize-space(ram:ChargeIndicator/udt:Indicator/text()) = 'true' or normalize-space(ram:ChargeIndicator/udt:Indicator/text()) = 'false'",
+              "digest": "dfdb2359fb7a12ab47339df44d7d4477efe29a661cf89351266f2a3a4e941981"
+            },
+            {
+              "id": "PEPPOL-EN16931-R061",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:SpecifiedTradeSettlementPaymentMeans[some $code in tokenize('49 59', '\\s') satisfies normalize-space(ram:TypeCode) = $code]",
+              "test": "../ram:SpecifiedTradePaymentTerms/ram:DirectDebitMandateID",
+              "digest": "28deb31ca543f2946107d8ab5296d86399ea7809c2850a47789b97986a64f5c6"
+            },
+            {
+              "id": "PEPPOL-EN16931-R110",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "rsm:SupplyChainTradeTransaction[ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime]/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime",
+              "test": "udt:DateTimeString \u003e= ../../../../ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime/udt:DateTimeString",
+              "digest": "04f54d50c21ac9f7a91f780a43b6071879eb62a3ead479b91661a28c5efe70a2"
+            },
+            {
+              "id": "PEPPOL-EN16931-R111",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "rsm:SupplyChainTradeTransaction[ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime]/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime",
+              "test": "udt:DateTimeString \u003c= ../../../../ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime/udt:DateTimeString",
+              "digest": "d130e5971008d598028d7901c53bdaca5175923b7b16ccf2e22b3731fc0aef88"
+            },
+            {
+              "id": "PEPPOL-EN16931-R120",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "ram:IncludedSupplyChainTradeLineItem",
+              "test": "u:slack($lineExtensionAmount, ($quantity * ($priceAmount div $baseQuantity)) + $chargesTotal - $allowancesTotal, $slackValue)",
+              "digest": "336b17674d8131a7421c467afeec456a4d99c0c870669617efce636da1995a23"
+            },
+            {
+              "id": "PEPPOL-EN16931-R101",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:IncludedSupplyChainTradeLineItem",
+              "test": "(not(ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument) or (ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument/ram:TypeCode='130'))",
+              "digest": "49c05360f638ea734f6058455c513d258527fb1e447ccb4bc8f2d2795dc245ce"
+            },
+            {
+              "id": "PEPPOL-EN16931-R121",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:NetPriceProductTradePrice | ram:GrossPriceProductTradePrice",
+              "test": "not(ram:BasisQuantity) or xs:decimal(ram:BasisQuantity) \u003e 0",
+              "digest": "642c632a2b1e19ea292eba477487903cf7e280ceee6c226e6645d178e17a8765"
+            },
+            {
+              "id": "PEPPOL-EN16931-R130",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ram:NetPriceProductTradePrice/ram:BasisQuantity[@unitCode] | ram:GrossPriceProductTradePrice/ram:BasisQuantity[@unitCode]",
+              "test": "@unitCode = ../../../ram:SpecifiedLineTradeDelivery/ram:BilledQuantity/@unitCode",
+              "digest": "516e346988731de77ee61acd65238933eac50a0e16dc9e54ca1aafc8dce268ac"
+            }
+          ]
+        }
+      ],
+      "ruleCount": 71
+    },
+    {
+      "syntax": "ubl",
+      "source": {
+        "path": "ubl/XRechnung-UBL-validation.sch",
+        "sha256": "d4ac5f6a79c224d6633e6697c1141637af409fecb1440206e7a166ea53bd8085"
+      },
+      "queryBinding": "xslt2",
+      "patterns": [
+        {
+          "id": "variable-pattern",
+          "group": "infrastructure"
+        },
+        {
+          "id": "ubl-pattern",
+          "group": "standard",
+          "rules": [
+            {
+              "id": "BR-DE-1",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice | /cn:CreditNote",
+              "test": "cac:PaymentMeans",
+              "digest": "e0a7280a4158942bfbcecea6bf9b64f805b3d12453e5b5de106f984f60e1ff58"
+            },
+            {
+              "id": "BR-DE-15",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice | /cn:CreditNote",
+              "test": "cbc:BuyerReference[boolean(normalize-space(.))]",
+              "digest": "6c78ca1162f56cce24c3446d656a07dd806950071f174af3fc7f93054f68feaf"
+            },
+            {
+              "id": "BR-DE-16",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice | /cn:CreditNote",
+              "test": "(not( ($BT-95-UBL-Inv = $supportedVATCodes or $BT-95-UBL-CN = $supportedVATCodes) or ($BT-102 = $supportedVATCodes) or ($BT-151 = $supportedVATCodes) ) or (cac:TaxRepresentativeParty, $BT-31orBT-32Path))",
+              "digest": "9b8bef5c8ce2d16f365bcfee38b2f99a7ae02aefff28f2b4784344219c123a53"
+            },
+            {
+              "id": "BR-DE-17",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/ubl:Invoice | /cn:CreditNote",
+              "test": "normalize-space(cbc:InvoiceTypeCode) = $supportedInvAndCNTypeCodes or normalize-space(cbc:CreditNoteTypeCode) = $supportedInvAndCNTypeCodes",
+              "digest": "d04d97aeda84769e26382fd837fa1a19475e0875b3c48b71d1b92f10e56f5d49"
+            },
+            {
+              "id": "BR-DE-18",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice | /cn:CreditNote",
+              "test": "every $line in cac:PaymentTerms/cbc:Note[1]/tokenize(. , '(\\r?\\n)')[starts-with( normalize-space(.) , '#')] satisfies matches ( normalize-space ($line), $XR-SKONTO-REGEX) and matches( cac:PaymentTerms/cbc:Note[1]/tokenize(. , '#.+#')[last()], '^\\s*\\n' )",
+              "digest": "a881e62621357c59e9ec43614bfe3b0958fa19f136933650d3588bdb9ad55385"
+            },
+            {
+              "id": "BR-DE-21",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/ubl:Invoice | /cn:CreditNote",
+              "test": "cbc:CustomizationID = $XR-CIUS-ID or cbc:CustomizationID = $XR-EXTENSION-ID or cbc:CustomizationID = $XR-CVD-ID",
+              "digest": "b2b83123a513309bb2c013140ddba9ea0b475299a5b9a331dfcdcdce6b95453a"
+            },
+            {
+              "id": "BR-DE-22",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice | /cn:CreditNote",
+              "test": "count(cac:AdditionalDocumentReference) = count(cac:AdditionalDocumentReference[not(./cac:Attachment/cbc:EmbeddedDocumentBinaryObject/@filename = preceding-sibling::cac:AdditionalDocumentReference/cac:Attachment/cbc:EmbeddedDocumentBinaryObject/@filename)])",
+              "digest": "b93e5876c240708a789c5507bbb5d9a070743db40711b55e7affe549dd125ee7"
+            },
+            {
+              "id": "BR-DE-26",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/ubl:Invoice | /cn:CreditNote",
+              "test": "((not(normalize-space(cbc:InvoiceTypeCode) = '384' or normalize-space(cbc:CreditNoteTypeCode) = '384') or (cac:BillingReference/cac:InvoiceDocumentReference)))",
+              "digest": "56c0a2b57e18cb43a982eedeb4da11fee165c5286a53dee6d6e1be6e6a013305"
+            },
+            {
+              "id": "BR-DE-30",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice | /cn:CreditNote",
+              "test": "not(cac:PaymentMeans/cac:PaymentMandate) or (cac:AccountingSupplierParty/cac:Party/cac:PartyIdentification/cbc:ID[@schemeID='SEPA'] | cac:PayeeParty/cac:PartyIdentification/cbc:ID[@schemeID='SEPA'])",
+              "digest": "a66a7a1433c4965c5bbceac0bad7f8a6b73ab55598a6a7966185629394a32f78"
+            },
+            {
+              "id": "BR-DE-31",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice | /cn:CreditNote",
+              "test": "not(cac:PaymentMeans/cac:PaymentMandate) or (cac:PaymentMeans/cac:PaymentMandate/cac:PayerFinancialAccount/cbc:ID)",
+              "digest": "8bacbfef6739ecb970662e4d5905755a0d525b21967595dae812d6691964044a"
+            },
+            {
+              "id": "BR-DE-TMP-32",
+              "kind": "assert",
+              "severity": "information",
+              "context": "/ubl:Invoice | /cn:CreditNote",
+              "test": "cac:Delivery/cbc:ActualDeliveryDate or cac:InvoicePeriod or (every $line in (cac:InvoiceLine | cac:CreditNoteLine) satisfies $line/cac:InvoicePeriod)",
+              "digest": "0b8012c87032cbba405984cc3ba25daa55dd60683594a5a0f270ee8452712025"
+            },
+            {
+              "id": "BR-TMP-2",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/ubl:Invoice/cac:AdditionalDocumentReference/cac:Attachment/cac:ExternalReference | /cn:CreditNote/cac:AdditionalDocumentReference/cac:Attachment/cac:ExternalReference",
+              "test": "matches(cbc:URI, $XR-URL-REGEX)",
+              "digest": "d624f9a8f003e5e609670d301683cf33d091983aebd2ad31ff5453ffa3383679"
+            },
+            {
+              "id": "BR-DE-2",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:AccountingSupplierParty | /cn:CreditNote/cac:AccountingSupplierParty",
+              "test": "cac:Party/cac:Contact",
+              "digest": "610e6b025632ac26b71eb873dc8afa6f072b6e578b8b1a95291bd181909be05d"
+            },
+            {
+              "id": "BR-DE-3",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:AccountingSupplierParty/cac:Party/cac:PostalAddress | /cn:CreditNote/cac:AccountingSupplierParty/cac:Party/cac:PostalAddress",
+              "test": "cbc:CityName[boolean(normalize-space(.))]",
+              "digest": "eeb6f216d1f439f156b679ca89ba2f42e4b27ad560068f675125462d9eff4c73"
+            },
+            {
+              "id": "BR-DE-4",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:AccountingSupplierParty/cac:Party/cac:PostalAddress | /cn:CreditNote/cac:AccountingSupplierParty/cac:Party/cac:PostalAddress",
+              "test": "cbc:PostalZone[boolean(normalize-space(.))]",
+              "digest": "0bc9b1cc52284eb74cf2e16b23bff0fbbe4fbc24ba6ebc2a827122c97b7e2ddc"
+            },
+            {
+              "id": "BR-DE-5",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:AccountingSupplierParty/cac:Party/cac:Contact | /cn:CreditNote/cac:AccountingSupplierParty/cac:Party/cac:Contact",
+              "test": "cbc:Name[boolean(normalize-space(.))]",
+              "digest": "6c612c7ac4b738f5c38d1728d6ef2fef87d9ad1375d40e8bb7495609f2565fa3"
+            },
+            {
+              "id": "BR-DE-6",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:AccountingSupplierParty/cac:Party/cac:Contact | /cn:CreditNote/cac:AccountingSupplierParty/cac:Party/cac:Contact",
+              "test": "cbc:Telephone[boolean(normalize-space(.))]",
+              "digest": "6427bf1115e0d2089b90aefa9d2902fadf1d92cff3d72d3ebde750f8dcadea8c"
+            },
+            {
+              "id": "BR-DE-7",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:AccountingSupplierParty/cac:Party/cac:Contact | /cn:CreditNote/cac:AccountingSupplierParty/cac:Party/cac:Contact",
+              "test": "cbc:ElectronicMail[boolean(normalize-space(.))]",
+              "digest": "77d399ec908aa25b9107745e5ac1eb9855246eb3d798cbacb2282ced817139dc"
+            },
+            {
+              "id": "BR-DE-27",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/ubl:Invoice/cac:AccountingSupplierParty/cac:Party/cac:Contact | /cn:CreditNote/cac:AccountingSupplierParty/cac:Party/cac:Contact",
+              "test": "matches(normalize-space(cbc:Telephone), $XR-TELEPHONE-REGEX)",
+              "digest": "f5ec1ded3881189ec1abc28872e0d5ac309d93c4c2e87f13f0b27a89df9a5139"
+            },
+            {
+              "id": "BR-DE-28",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/ubl:Invoice/cac:AccountingSupplierParty/cac:Party/cac:Contact | /cn:CreditNote/cac:AccountingSupplierParty/cac:Party/cac:Contact",
+              "test": "matches(normalize-space(cbc:ElectronicMail), $XR-EMAIL-REGEX)",
+              "digest": "2ac962c0921fea9190b37fa5bef0078f395c668192a15f7b81c5b33a051ce947"
+            },
+            {
+              "id": "BR-DE-8",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:AccountingCustomerParty/cac:Party/cac:PostalAddress | /cn:CreditNote/cac:AccountingCustomerParty/cac:Party/cac:PostalAddress",
+              "test": "cbc:CityName[boolean(normalize-space(.))]",
+              "digest": "3daee5d0e61685b110e1c6b8120328f0fb5d643779e8dc7a2a9d9481d06f2d81"
+            },
+            {
+              "id": "BR-DE-9",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:AccountingCustomerParty/cac:Party/cac:PostalAddress | /cn:CreditNote/cac:AccountingCustomerParty/cac:Party/cac:PostalAddress",
+              "test": "cbc:PostalZone[boolean(normalize-space(.))]",
+              "digest": "c0c470bd83853aefd97142e78ad4cb261d59585f39921eb00eb7a2ba61f54cb4"
+            },
+            {
+              "id": "BR-DE-10",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:Delivery/cac:DeliveryLocation/cac:Address | /cn:CreditNote/cac:Delivery/cac:DeliveryLocation/cac:Address",
+              "test": "cbc:CityName[boolean(normalize-space(.))]",
+              "digest": "d632521813280698735c0657cf52864b6fbfa2999858ee2ee20c481022d038e4"
+            },
+            {
+              "id": "BR-DE-11",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:Delivery/cac:DeliveryLocation/cac:Address | /cn:CreditNote/cac:Delivery/cac:DeliveryLocation/cac:Address",
+              "test": "cbc:PostalZone[boolean(normalize-space(.))]",
+              "digest": "7f38182b9d36ff3c981c2357f2af3deeeb6b9d75e54bd7539ce97da85c568dde"
+            },
+            {
+              "id": "BR-DE-19",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/ubl:Invoice/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = ('30','58')] | /cn:CreditNote/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = ('30','58')]",
+              "test": "not(normalize-space(cbc:PaymentMeansCode) = '58') or matches(normalize-space(replace(cac:PayeeFinancialAccount/cbc:ID, '([ \\n\\r\\t\\s])', '')), '^[A-Z]{2}[0-9]{2}[a-zA-Z0-9]{0,30}$') and xs:integer(string-join(for $cp in string-to-codepoints(concat(substring(normalize-space(replace(cac:PayeeFinancialAccount/cbc:ID, '([ \\n\\r\\t\\s])', '')),5),upper-case(substring(normalize-space(replace(cac:PayeeFinancialAccount/cbc:ID, '([ \\n\\r\\t\\s])', '')),1,2)),substring(normalize-space(replace(cac:PayeeFinancialAccount/cbc:ID, '([ \\n\\r\\t\\s])', '')),3,2))) return (if($cp \u003e 64) then string($cp - 55) else string($cp - 48)),'')) mod 97 = 1",
+              "digest": "0f14487fc507277d380d68778c89abbc6534c23c88d6633caaccad12c36f012f"
+            },
+            {
+              "id": "BR-DE-23-a",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = ('30','58')] | /cn:CreditNote/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = ('30','58')]",
+              "test": "cac:PayeeFinancialAccount",
+              "digest": "32f292b8eb1889264d7b394b680d9a7a3bf91e4e484378cc821184e0794fd8a7"
+            },
+            {
+              "id": "BR-DE-23-b",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = ('30','58')] | /cn:CreditNote/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = ('30','58')]",
+              "test": "not(cac:CardAccount) and not(cac:PaymentMandate)",
+              "digest": "e547e018c90a5d33e706571c11c4cf72506fa5cf717ddfe035df2f6cb132bccf"
+            },
+            {
+              "id": "BR-DE-24-a",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = ('48','54','55')] |/cn:CreditNote/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = ('48','54','55')]",
+              "test": "cac:CardAccount",
+              "digest": "4c21a99ab0725a5a2a916a5445d9160655aa7c261f17c398c2312847f1d26cf3"
+            },
+            {
+              "id": "BR-DE-24-b",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = ('48','54','55')] |/cn:CreditNote/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = ('48','54','55')]",
+              "test": "not(cac:PayeeFinancialAccount) and not(cac:PaymentMandate)",
+              "digest": "30fa274cc7539e0462a004773c7d956958f05c854ba1b27f1645d32c585fd888"
+            },
+            {
+              "id": "BR-DE-20",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/ubl:Invoice/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = '59'] | /cn:CreditNote/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = '59']",
+              "test": "not(normalize-space(cbc:PaymentMeansCode) = '59') or matches(normalize-space(replace(cac:PaymentMandate/cac:PayerFinancialAccount/cbc:ID, '([ \\n\\r\\t\\s])', '')), '^[A-Z]{2}[0-9]{2}[a-zA-Z0-9]{0,30}$') and xs:decimal(string-join(for $cp in string-to-codepoints(concat(substring(normalize-space(replace(cac:PaymentMandate/cac:PayerFinancialAccount/cbc:ID, '([ \\n\\r\\t\\s])', '')),5),upper-case(substring(normalize-space(replace(cac:PaymentMandate/cac:PayerFinancialAccount/cbc:ID, '([ \\n\\r\\t\\s])', '')),1,2)),substring(normalize-space(replace(cac:PaymentMandate/cac:PayerFinancialAccount/cbc:ID, '([ \\n\\r\\t\\s])', '')),3,2))) return (if($cp \u003e 64) then string($cp - 55) else string($cp - 48)),'')) mod 97 = 1",
+              "digest": "f7d6cac275c1b6110fab7005b6215c579a3047fb67ba74f09641e52896abd8f4"
+            },
+            {
+              "id": "BR-DE-25-a",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = '59'] | /cn:CreditNote/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = '59']",
+              "test": "cac:PaymentMandate",
+              "digest": "2624fafa1cc13a867542170e22d98c0a808108fc54a381e3c606a09f2afcf830"
+            },
+            {
+              "id": "BR-DE-25-b",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = '59'] | /cn:CreditNote/cac:PaymentMeans[normalize-space(cbc:PaymentMeansCode) = '59']",
+              "test": "not(cac:PayeeFinancialAccount) and not(cac:CardAccount)",
+              "digest": "80ca7624a2fa831198e174c454e3fd678f6b8ec430b90cab65f0e02a0efd796a"
+            },
+            {
+              "id": "BR-DE-14",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:TaxTotal/cac:TaxSubtotal | /cn:CreditNote/cac:TaxTotal/cac:TaxSubtotal",
+              "test": "cac:TaxCategory/cbc:Percent[boolean(normalize-space(.))]",
+              "digest": "5d53a6843b08ce75bef1b44b65174e44bf773aa16ee8a78fc402fd7a4bb91c94"
+            }
+          ]
+        },
+        {
+          "id": "ubl-extension-pattern",
+          "group": "extension",
+          "rules": [
+            {
+              "id": "BR-DEX-01",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cbc:EmbeddedDocumentBinaryObject[$isExtension]",
+              "test": ".[@mimeCode = 'application/pdf' or @mimeCode = 'image/png' or @mimeCode = 'image/jpeg' or @mimeCode = 'text/csv' or @mimeCode = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or @mimeCode = 'application/vnd.oasis.opendocument.spreadsheet' or @mimeCode = 'application/xml']",
+              "digest": "846987c4ed6d9e7a95c1cc3674a53a88db43072800597db9f4ae2b12ab6187a7"
+            },
+            {
+              "id": "BR-DEX-02",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "/ubl:Invoice[$isExtension]",
+              "test": "(every $invoiceline in /ubl:Invoice/cac:InvoiceLine[ exists (./cac:SubInvoiceLine) ] satisfies $invoiceline/xs:decimal(cbc:LineExtensionAmount) = sum($invoiceline/cac:SubInvoiceLine/xs:decimal(cbc:LineExtensionAmount))) and (count( //cac:SubInvoiceLine [count(cac:SubInvoiceLine) \u003e 0 and xs:decimal(cbc:LineExtensionAmount) = sum(cac:SubInvoiceLine/xs:decimal(cbc:LineExtensionAmount))]) = count(//cac:SubInvoiceLine [count(cac:SubInvoiceLine) \u003e 0]))",
+              "digest": "019d1a12a95659dbd43dd4f400bfbf3c6a0f2339639832bebc8a54114eaf63b1"
+            },
+            {
+              "id": "BR-DEX-03",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice[$isExtension]",
+              "test": "not(exists(//cac:SubInvoiceLine/cac:Item[ count ( cac:ClassifiedTaxCategory) != 1]))",
+              "digest": "d39ff6b0c454d9e758f8acb57d70d332d266b90d382704354b3d66ac054887c2"
+            },
+            {
+              "id": "BR-DEX-09",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:LegalMonetaryTotal[$isExtension]",
+              "test": "(round((xs:decimal(cbc:PayableAmount) - $payableroundingamount) * 10 * 10) div 100) = (round((xs:decimal(cbc:TaxInclusiveAmount) - $prepaidamount + $thirdpartyprepaidamount) * 10 * 10) div 100)",
+              "digest": "5e60aa6fd10c96dc5375dd71f55cce05a6776c16753da54bc575b6c7b12c3879"
+            },
+            {
+              "id": "BR-DEX-04",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:PartyIdentification/cbc:ID[@schemeID and $isExtension]",
+              "test": "((not(contains(normalize-space(@schemeID), ' ')) and contains($ISO-6523-ICD-EXT-CODES, concat(' ', normalize-space(@schemeID), ' ')))) or ((not(contains(normalize-space(@schemeID), ' ')) and contains(' SEPA ', concat(' ', normalize-space(@schemeID), ' '))) and ((ancestor::cac:AccountingSupplierParty) or (ancestor::cac:PayeeParty)))",
+              "digest": "bd35672ea9e205c598b1e5c70ee480dcbddca1190dde03e8a91ed1f8a935424f"
+            },
+            {
+              "id": "BR-DEX-05",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:PartyLegalEntity/cbc:CompanyID[@schemeID and $isExtension]",
+              "test": "((not(contains(normalize-space(@schemeID), ' ')) and contains($ISO-6523-ICD-EXT-CODES, concat(' ', normalize-space(@schemeID), ' '))))",
+              "digest": "0399fba0fa445433fe3778e4d28dfb9e153583317ac5baad6fba2b801caeec7a"
+            },
+            {
+              "id": "BR-DEX-06",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:StandardItemIdentification/cbc:ID[@schemeID and $isExtension]",
+              "test": "((not(contains(normalize-space(@schemeID), ' ')) and contains($ISO-6523-ICD-EXT-CODES, concat(' ', normalize-space(@schemeID), ' '))))",
+              "digest": "ad53a8c4488b43e51b10d3f959aec23c8c18e6a3da6fb49b72509549cd8f9671"
+            },
+            {
+              "id": "BR-DEX-07",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cbc:EndpointID[@schemeID and $isExtension]",
+              "test": "((not(contains(normalize-space(@schemeID), ' ')) and contains($CEF-EAS-EXT-CODES, concat(' ', normalize-space(@schemeID), ' '))))",
+              "digest": "b243c330e3fb2e8efa4941f56cf1b7b3f6d86ce6211082cd69daa99e99ef0607"
+            },
+            {
+              "id": "BR-DEX-08",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:DeliveryLocation/cbc:ID[@schemeID and $isExtension]",
+              "test": "((not(contains(normalize-space(@schemeID), ' ')) and contains($ISO-6523-ICD-EXT-CODES, concat(' ', normalize-space(@schemeID), ' '))))",
+              "digest": "23d9a54df51dd5dacaa475db95894ecdf75f7e3ac9782ebcefecafee57e505a3"
+            },
+            {
+              "id": "BR-DEX-10",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:PrepaidPayment[$isExtension]",
+              "test": "cbc:ID[boolean(normalize-space(xs:string(.)))]",
+              "digest": "6545d10bd662ade15670568239f3eb75cbe31895af3fd6f5c9cf56fff6bea75b"
+            },
+            {
+              "id": "BR-DEX-11",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:PrepaidPayment[$isExtension]",
+              "test": "cbc:PaidAmount[boolean(normalize-space(xs:string(.)))]",
+              "digest": "c216571b2518389c18eb2cf87779ee8714c754c94be42cb6edb2a07db0b6a4d8"
+            },
+            {
+              "id": "BR-DEX-12",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:PrepaidPayment[$isExtension]",
+              "test": "cbc:InstructionID[boolean(normalize-space(xs:string(.)))]",
+              "digest": "cc152d478424dae81994a625536d8685f7fe02418ef8687b383ab2d181bc5300"
+            },
+            {
+              "id": "BR-DEX-13",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:PrepaidPayment[$isExtension]",
+              "test": "string-length(substring-after(cbc:PaidAmount, '.')) \u003c= 2",
+              "digest": "785cd9e88e6da9a062752067ec2ad0bbbd9a1d705e273a2fd591b063bef27c10"
+            },
+            {
+              "id": "BR-DEX-14",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "/ubl:Invoice/cac:PrepaidPayment[$isExtension]",
+              "test": "cbc:PaidAmount/@currencyID = parent::node()/cbc:DocumentCurrencyCode",
+              "digest": "bc5a52a08ba9c84517019b1366aaf1dc5942094bc3e391ccdfca23ab2c9bc795"
+            }
+          ]
+        },
+        {
+          "id": "ubl-cvd-pattern",
+          "group": "cvd",
+          "rules": [
+            {
+              "id": "BR-DE-CVD-02",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "(/ubl:Invoice | /cn:CreditNote)[$isCVD]",
+              "test": "cac:OriginatorDocumentReference/cbc:ID[boolean(normalize-space(.))]",
+              "digest": "6f9346c974e54d9da28c3f2af5e6e1243f717ca67e8376ae24aeed4eb7e282ec"
+            },
+            {
+              "id": "BR-DE-CVD-01",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "(/ubl:Invoice | /cn:CreditNote)[$isCVD]",
+              "test": "cac:ContractDocumentReference/cbc:ID[boolean(normalize-space(.))]",
+              "digest": "3f52699f141a24b9e679ce4e905a4290974330ee75deaf922b516eb32e645089"
+            },
+            {
+              "id": "BR-DE-CVD-03",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "(/ubl:Invoice | /cn:CreditNote)[$isCVD]",
+              "test": "(cac:InvoiceLine/cac:Item | cac:CreditNoteLine/cac:Item)[cac:CommodityClassification/cbc:ItemClassificationCode/@listID = 'CVD' and cac:AdditionalItemProperty/cbc:Name = 'cva']",
+              "digest": "b658eb676d12c48797948f6f8056f20168e1e457109f1687e3cf644c2f34c27d"
+            },
+            {
+              "id": "BR-DE-CVD-06-a",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "(/ubl:Invoice[$isCVD]/cac:InvoiceLine | /cn:CreditNote[$isCVD]/cac:CreditNoteLine)/cac:Item",
+              "test": "not(cac:CommodityClassification/cbc:ItemClassificationCode[@listID = 'CVD']) or count(cac:AdditionalItemProperty[cbc:Name = 'cva']) = 1",
+              "digest": "42f34841ff7c0620f234b2b3ea2ee172c1d0a30efb9f55fb88add1ba947ef4a3"
+            },
+            {
+              "id": "BR-DE-CVD-06-b",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "(/ubl:Invoice[$isCVD]/cac:InvoiceLine | /cn:CreditNote[$isCVD]/cac:CreditNoteLine)/cac:Item",
+              "test": "not(cac:AdditionalItemProperty[cbc:Name = 'cva']) or count(cac:CommodityClassification/cbc:ItemClassificationCode[@listID = 'CVD']) = 1",
+              "digest": "312fb0e11149d324e98353baf40b2efa96617c33cafe084aa3d77f638a690655"
+            },
+            {
+              "id": "BR-TMP-CVD-01",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "(/ubl:Invoice[$isCVD]/cac:InvoiceLine | /cn:CreditNote[$isCVD]/cac:CreditNoteLine)/cac:Item/cac:CommodityClassification/cbc:ItemClassificationCode",
+              "test": "((not(contains(normalize-space(@listID), ' ')) and contains($UNTDID-7143-CVD-CODES, concat(' ', normalize-space(@listID), ' '))))",
+              "digest": "abb1977abbaaf3a80de33c037cb2a126864f2b0826199f30fe494de3f971dd6b"
+            },
+            {
+              "id": "BR-DE-CVD-04",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "(/ubl:Invoice[$isCVD]/cac:InvoiceLine | /cn:CreditNote[$isCVD]/cac:CreditNoteLine)/cac:Item/cac:CommodityClassification/cbc:ItemClassificationCode",
+              "test": "not(normalize-space(@listID) = 'CVD') or normalize-space(.) = $CVD-VEHICLE-CATEGORY",
+              "digest": "e2418ad83e7ac978df0f9dccca675ed62ef50406ef2272c26b3035cbe1e6afd7"
+            },
+            {
+              "id": "BR-DE-CVD-05",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "(/ubl:Invoice[$isCVD]/cac:InvoiceLine | /cn:CreditNote[$isCVD]/cac:CreditNoteLine)/cac:Item/cac:AdditionalItemProperty[cbc:Name = 'cva']",
+              "test": "normalize-space(cbc:Value) = $CVA-CODES",
+              "digest": "2dbcfd74b39fbbe12741d2c19383f941eb7cb4702fadfa0e078273b86e1e21bd"
+            }
+          ]
+        },
+        {
+          "id": "peppol-ubl-pattern-1",
+          "group": "peppol",
+          "rules": [
+            {
+              "id": "PEPPOL-EN16931-R008",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "//*[not(*) and not(normalize-space())]",
+              "test": "false()",
+              "digest": "4098eef74812843a66f5aebef2b64d252f21b58d6043d8e7a3a6ce6fc633e84e"
+            }
+          ]
+        },
+        {
+          "id": "peppol-ubl-pattern-2",
+          "group": "peppol",
+          "rules": [
+            {
+              "id": "PEPPOL-EN16931-R001",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ubl-creditnote:CreditNote | ubl-invoice:Invoice",
+              "test": "cbc:ProfileID",
+              "digest": "1f255aefa017c16d662921c81d494209d37296aa59f116b099af6a667ca4e111"
+            },
+            {
+              "id": "PEPPOL-EN16931-R053",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ubl-creditnote:CreditNote | ubl-invoice:Invoice",
+              "test": "count(cac:TaxTotal[cac:TaxSubtotal]) = 1",
+              "digest": "8f1f84158cad2b061438d1d11b36ca7c319411b710017be6b70ce1c7f1c6987b"
+            },
+            {
+              "id": "PEPPOL-EN16931-R054",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ubl-creditnote:CreditNote | ubl-invoice:Invoice",
+              "test": "count(cac:TaxTotal[not(cac:TaxSubtotal)]) = (if (cbc:TaxCurrencyCode) then 1 else 0)",
+              "digest": "cd24dc3150a23afe99870a0b6d69fcca2a53061b3ae2a6ac8ed32eebb9dd6673"
+            },
+            {
+              "id": "PEPPOL-EN16931-R055",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ubl-creditnote:CreditNote | ubl-invoice:Invoice",
+              "test": "not(cbc:TaxCurrencyCode) or (cac:TaxTotal/cbc:TaxAmount[@currencyID=normalize-space(../../cbc:TaxCurrencyCode)] \u003c= 0 and cac:TaxTotal/cbc:TaxAmount[@currencyID=normalize-space(../../cbc:DocumentCurrencyCode)] \u003c= 0) or (cac:TaxTotal/cbc:TaxAmount[@currencyID=normalize-space(../../cbc:TaxCurrencyCode)] \u003e= 0 and cac:TaxTotal/cbc:TaxAmount[@currencyID=normalize-space(../../cbc:DocumentCurrencyCode)] \u003e= 0)",
+              "digest": "83d07258a12da69155aed4301569e35d5fd9bf1d365651103f76e47e086016a9"
+            },
+            {
+              "id": "PEPPOL-EN16931-R005",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cbc:TaxCurrencyCode",
+              "test": "not(normalize-space(text()) = normalize-space(../cbc:DocumentCurrencyCode/text()))",
+              "digest": "c827f603739e7bacabc814a14cc8ab6a7581d53e45bc9b78bed3726fee39edc2"
+            },
+            {
+              "id": "PEPPOL-EN16931-R010",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:AccountingCustomerParty/cac:Party",
+              "test": "cbc:EndpointID",
+              "digest": "727f9e5847d80394613cdb64e8590268f49b1763c7d568af90ff954b2683d6b6"
+            },
+            {
+              "id": "PEPPOL-EN16931-R020",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:AccountingSupplierParty/cac:Party",
+              "test": "cbc:EndpointID",
+              "digest": "0273ecbd52929ab63c789627ca7d250df0012e1118ebf04952345163c3ca7a91"
+            },
+            {
+              "id": "PEPPOL-EN16931-R041",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ubl-invoice:Invoice/cac:AllowanceCharge[cbc:MultiplierFactorNumeric and not(cbc:BaseAmount)] | ubl-invoice:Invoice/cac:InvoiceLine/cac:AllowanceCharge[cbc:MultiplierFactorNumeric and not(cbc:BaseAmount)] | ubl-creditnote:CreditNote/cac:AllowanceCharge[cbc:MultiplierFactorNumeric and not(cbc:BaseAmount)] | ubl-creditnote:CreditNote/cac:CreditNoteLine/cac:AllowanceCharge[cbc:MultiplierFactorNumeric and not(cbc:BaseAmount)]",
+              "test": "false()",
+              "digest": "185a0d72f36574ff90ca19f94d64e692fbeb4a82b3f844cf311a1c27f7f0969c"
+            },
+            {
+              "id": "PEPPOL-EN16931-R042",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ubl-invoice:Invoice/cac:AllowanceCharge[not(cbc:MultiplierFactorNumeric) and cbc:BaseAmount] | ubl-invoice:Invoice/cac:InvoiceLine/cac:AllowanceCharge[not(cbc:MultiplierFactorNumeric) and cbc:BaseAmount] | ubl-creditnote:CreditNote/cac:AllowanceCharge[not(cbc:MultiplierFactorNumeric) and cbc:BaseAmount] | ubl-creditnote:CreditNote/cac:CreditNoteLine/cac:AllowanceCharge[not(cbc:MultiplierFactorNumeric) and cbc:BaseAmount]",
+              "test": "false()",
+              "digest": "25f02ad4de9029564577b6e2a464ce236b4cbaec485070066c8f354a576881c6"
+            },
+            {
+              "id": "PEPPOL-EN16931-R040",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ubl-invoice:Invoice/cac:AllowanceCharge | ubl-invoice:Invoice/cac:InvoiceLine/cac:AllowanceCharge | ubl-creditnote:CreditNote/cac:AllowanceCharge | ubl-creditnote:CreditNote/cac:CreditNoteLine/cac:AllowanceCharge",
+              "test": "not(cbc:MultiplierFactorNumeric and cbc:BaseAmount) or u:slack(if (cbc:Amount) then cbc:Amount else 0, (xs:decimal(cbc:BaseAmount) * xs:decimal(cbc:MultiplierFactorNumeric)) div 100, $slackValue)",
+              "digest": "fbab92ffd06409f725811977f08a252b54c29b989e2843f2a17a85a41f3b5090"
+            },
+            {
+              "id": "PEPPOL-EN16931-R043",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ubl-invoice:Invoice/cac:AllowanceCharge | ubl-invoice:Invoice/cac:InvoiceLine/cac:AllowanceCharge | ubl-creditnote:CreditNote/cac:AllowanceCharge | ubl-creditnote:CreditNote/cac:CreditNoteLine/cac:AllowanceCharge",
+              "test": "normalize-space(cbc:ChargeIndicator/text()) = 'true' or normalize-space(cbc:ChargeIndicator/text()) = 'false'",
+              "digest": "9d6dac3b2ae8c08572e95686b5c754cf51dbb2bb486b1e634704ecda823c2ebe"
+            },
+            {
+              "id": "PEPPOL-EN16931-R061",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:PaymentMeans[some $code in tokenize('49 59', '\\s') satisfies normalize-space(cbc:PaymentMeansCode) = $code]",
+              "test": "cac:PaymentMandate/cbc:ID",
+              "digest": "b5c67919c9d87cb40eaa4f41c30b442d76573aa26d2776d2dfea5e7534849aef"
+            },
+            {
+              "id": "PEPPOL-EN16931-R110",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ubl-invoice:Invoice[cac:InvoicePeriod/cbc:StartDate]/cac:InvoiceLine/cac:InvoicePeriod/cbc:StartDate | ubl-creditnote:CreditNote[cac:InvoicePeriod/cbc:StartDate]/cac:CreditNoteLine/cac:InvoicePeriod/cbc:StartDate",
+              "test": "xs:date(text()) \u003e= xs:date(../../../cac:InvoicePeriod/cbc:StartDate)",
+              "digest": "19621e26cb8e5f9ed8998b76b8379d3084ef5ac1b628f2fbf606e20a5259c94a"
+            },
+            {
+              "id": "PEPPOL-EN16931-R111",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "ubl-invoice:Invoice[cac:InvoicePeriod/cbc:EndDate]/cac:InvoiceLine/cac:InvoicePeriod/cbc:EndDate | ubl-creditnote:CreditNote[cac:InvoicePeriod/cbc:EndDate]/cac:CreditNoteLine/cac:InvoicePeriod/cbc:EndDate",
+              "test": "xs:date(text()) \u003c= xs:date(../../../cac:InvoicePeriod/cbc:EndDate)",
+              "digest": "2d9b30ecbbc6e109dcad019233a8afa04eba903a326edbae6158d70cdeef06e9"
+            },
+            {
+              "id": "PEPPOL-EN16931-R120",
+              "kind": "assert",
+              "severity": "warning",
+              "context": "cac:InvoiceLine | cac:CreditNoteLine",
+              "test": "u:slack($lineExtensionAmount, ($quantity * ($priceAmount div $baseQuantity)) + $chargesTotal - $allowancesTotal, $slackValue)",
+              "digest": "18d482b50e1ca71992309feca498369e460e89d39b7d5cefeb9eb0898bfaefdc"
+            },
+            {
+              "id": "PEPPOL-EN16931-R121",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:InvoiceLine | cac:CreditNoteLine",
+              "test": "not(cac:Price/cbc:BaseQuantity) or xs:decimal(cac:Price/cbc:BaseQuantity) \u003e 0",
+              "digest": "31818cc0a95abe86967a3fc4e1cf95fefb5ad49d60f97f714fc2296a7f0290f3"
+            },
+            {
+              "id": "PEPPOL-EN16931-R101",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:InvoiceLine | cac:CreditNoteLine",
+              "test": "(not(cac:DocumentReference) or (cac:DocumentReference/cbc:DocumentTypeCode='130'))",
+              "digest": "3adee1464c5394ead570c411001735a803d699c52001f0246ba981518ba610e7"
+            },
+            {
+              "id": "PEPPOL-EN16931-R044",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:Price/cac:AllowanceCharge",
+              "test": "normalize-space(cbc:ChargeIndicator) = 'false'",
+              "digest": "a51e1647db833c2083e7741c76f99fefd19e2e9fe16ddb6ab7b4239818f13a82"
+            },
+            {
+              "id": "PEPPOL-EN16931-R046",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:Price/cac:AllowanceCharge",
+              "test": "not(cbc:BaseAmount) or xs:decimal(../cbc:PriceAmount) = xs:decimal(cbc:BaseAmount) - xs:decimal(cbc:Amount)",
+              "digest": "de7a51b315f3f75553a0d7392f92fc3d020eb45ce1a8526999155f4b7ef4ad6a"
+            },
+            {
+              "id": "PEPPOL-EN16931-R130",
+              "kind": "assert",
+              "severity": "fatal",
+              "context": "cac:Price/cbc:BaseQuantity[@unitCode]",
+              "test": "not($hasQuantity) or @unitCode = $quantity/@unitCode",
+              "digest": "b77ceaa4f22cc67f1fdf4c86ea4791215782b03c308dd88ee04feee93153cb3f"
+            }
+          ]
+        }
+      ],
+      "ruleCount": 76
+    }
+  ]
+}
