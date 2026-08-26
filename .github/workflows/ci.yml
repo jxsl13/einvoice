@@ -148,6 +148,8 @@ jobs:
         assert_ineligible '{"author":{"login":"github-actions[bot]"},"files":[{"path":".github/dependencies/parity.json"}]}'
         assert_ineligible '{"author":{"login":"jxsl13"},"files":[{"path":"go.mod"}]}'
         assert_ineligible '{"author":{"login":"dependabot"},"files":[]}'
+        markers="$(printf '%s\n' 'Dependency-PR: #7' 'Go-Dependency-PR: #8' 'Toolchain-PR: #9' | sed -n -E 's/^(Go-)?Dependency-PR: #([0-9]+)$/\2/p' | paste -sd, -)"
+        test "${markers}" = '7,8'
 
     - name: Reject Java artifacts and build a static CLI
       shell: bash
