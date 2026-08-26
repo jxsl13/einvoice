@@ -16,8 +16,11 @@ history, BSD-3-Clause license, and notices are retained.
 ## Releases
 
 - The module path is `github.com/jxsl13/einvoice`.
-- Releases use signed semantic-version tags and publish checksums, an SPDX SBOM,
-  test coverage, rule-inventory coverage, corpus provenance, and KoSIT parity.
+- Manual feature releases use signed semantic-version tags. Automated
+  dependency-only patch releases originate from protected main and publish
+  checksums plus GitHub provenance attestations. Production candidates also
+  publish an SPDX SBOM, test coverage, rule-inventory coverage, corpus
+  provenance, and KoSIT parity.
 - Pre-1.0 releases may change the API only through documented release notes.
 - Hugo Studio pins an exact released version and checksum behind a narrow
   adapter; it never consumes an untagged branch or pseudo-version.
@@ -25,6 +28,21 @@ history, BSD-3-Clause license, and notices are retained.
   shows every enabled official rule ID, at least 95% Go statement coverage,
   at least 99.9% normalized KoSIT verdict parity, and zero false accepts for
   fatal or error findings.
+
+## Dependency train
+
+- Dependabot opens grouped weekly Go-module and GitHub Actions updates.
+- `.github/dependencies/parity.json` is the explicit non-shipping toolchain
+  dependency manifest for KoSIT Validator, XRechnung configuration, and
+  XRechnung Schematron. A weekly job resolves releases and downloads every asset
+  into a disposable directory to verify the advertised SHA-256 before proposing
+  a change.
+- Dependency pull requests are armed for squash auto-merge, but protected main
+  merges them only after every required CI check passes.
+- Each merged dependency train reruns the release gate and increments only the
+  patch component. Feature, minor, and major releases are tagged manually.
+- The hourly release reconciler catches a bot-created pull request even when a
+  GitHub token suppresses recursive workflow events.
 
 ## Java boundary
 

@@ -1,0 +1,29 @@
+{
+  "dependencies": {
+    "kositValidator": {
+      "asset": "validator-1.6.3-standalone.jar",
+      "license": "Apache-2.0",
+      "repository": "itplr-kosit/validator",
+      "sha256": "799e64befca97d4080e03608c80b85dd5a5ecc5f4ae4f35d1116ec2855b9a7c9",
+      "url": "https://github.com/itplr-kosit/validator/releases/download/v1.6.3/validator-1.6.3-standalone.jar",
+      "version": "v1.6.3"
+    },
+    "xrechnungConfiguration": {
+      "asset": "xrechnung-3.0.2-validator-configuration-2026-01-31.zip",
+      "license": "Apache-2.0",
+      "repository": "itplr-kosit/validator-configuration-xrechnung",
+      "sha256": "6a5a5911a421b25fbc423f62f93f894df7b236f5d73ca4f84bb222a945082704",
+      "url": "https://github.com/itplr-kosit/validator-configuration-xrechnung/releases/download/v2026-01-31/xrechnung-3.0.2-validator-configuration-2026-01-31.zip",
+      "version": "v2026-01-31"
+    },
+    "xrechnungSchematron": {
+      "asset": "xrechnung-3.0.2-schematron-2.5.0.zip",
+      "license": "Apache-2.0",
+      "repository": "itplr-kosit/xrechnung-schematron",
+      "sha256": "a0f3d82737759bee8591c298ff24983a8f1c667f85e45a34863c75a242bc6f43",
+      "url": "https://github.com/itplr-kosit/xrechnung-schematron/releases/download/v2.5.0/xrechnung-3.0.2-schematron-2.5.0.zip",
+      "version": "v2.5.0"
+    }
+  },
+  "schemaVersion": 1
+}

@@ -1,0 +1,160 @@
+name: Dependency patch release
+
+on:
+  pull_request_target:
+    types: [closed]
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  attestations: write
+  contents: write
+  id-token: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: dependency-patch-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Gate and publish dependency patch
+    if: >-
+      github.event_name != 'pull_request_target' ||
+      (github.event.pull_request.merged == true &&
+       contains(github.event.pull_request.labels.*.name, 'release:patch'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout protected main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Reconcile dependency releases after interrupted label updates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh label create 'release:published' --color 5319e7 \
+            --description 'Included in an automated dependency patch release' --force
+          gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' | \
+            while read -r tag; do
+              gh release view "${tag}" --json body --jq '.body' | \
+                sed -n 's/^Dependency-PR: #\([0-9][0-9]*\)$/\1/p' | \
+                while read -r number; do
+                  gh pr edit "${number}" --remove-label 'release:patch' \
+                    --add-label 'release:published' >/dev/null 2>&1 || true
+                done
+            done
+
+      - name: Find merged dependency updates awaiting release
+        id: pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh pr list --state merged --label 'release:patch' --limit 100 \
+            --json number,title,url,labels > "${RUNNER_TEMP}/merged-dependencies.json"
+          jq '[.[] | select(any(.labels[]; .name == "release:published") | not)]' \
+            "${RUNNER_TEMP}/merged-dependencies.json" > "${RUNNER_TEMP}/pending-dependencies.json"
+          count="$(jq 'length' "${RUNNER_TEMP}/pending-dependencies.json")"
+          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+          jq -r '.[] | "- #\(.number) \(.title)"' \
+            "${RUNNER_TEMP}/pending-dependencies.json" > "${RUNNER_TEMP}/dependency-notes.md"
+
+      - name: Set up Go
+        if: steps.pending.outputs.count != '0'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Run patch release gate
+        if: steps.pending.outputs.count != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          go mod download
+          go mod verify
+          go vet ./...
+          go test -race ./...
+          if find . -path ./.git -prune -o -type f \
+            \( -name '*.java' -o -name '*.class' -o -name '*.jar' \
+               -o -name '*.jmod' -o -name '*.war' -o -name '*.ear' \
+               -o -name 'pom.xml' -o -name 'build.gradle*' \) \
+            -print -quit | grep -q .; then
+            echo 'Java artifact found in the public module'
+            exit 1
+          fi
+          CGO_ENABLED=0 go build -trimpath -o "${RUNNER_TEMP}/einvoice" ./cmd/einvoice
+
+      - name: Prepare patch version and release evidence
+        if: steps.pending.outputs.count != '0'
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest="$(gh release list --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')"
+          if [[ ! "${latest}" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo 'Create the first feature/pre-release manually before dependency patch releases.' >&2
+            exit 1
+          fi
+          next="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))${BASH_REMATCH[4]}"
+          prerelease=false
+          if [[ -n "${BASH_REMATCH[4]}" ]]; then prerelease=true; fi
+          echo "tag=${next}" >> "${GITHUB_OUTPUT}"
+          echo "prerelease=${prerelease}" >> "${GITHUB_OUTPUT}"
+
+          mkdir -p dist
+          prefix="einvoice-${next#v}/"
+          git archive --format=tar.gz --prefix="${prefix}" \
+            --output="dist/einvoice-${next#v}.tar.gz" HEAD
+          sha256sum "dist/einvoice-${next#v}.tar.gz" > "dist/einvoice-${next#v}.sha256"
+          go list -m -json all > "dist/einvoice-${next#v}-dependencies.json"
+
+      - name: Attest dependency patch artifacts
+        if: steps.pending.outputs.count != '0'
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: dist/*
+
+      - name: Publish patch release and close the train
+        if: steps.pending.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT_TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'Automated dependency-only patch release from protected main.'
+            echo
+            cat "${RUNNER_TEMP}/dependency-notes.md"
+            echo
+            echo 'This release does not change the documented fiscal-conformance status.'
+            echo
+            jq -r '.[] | "Dependency-PR: #\(.number)"' \
+              "${RUNNER_TEMP}/pending-dependencies.json"
+          } > "${RUNNER_TEMP}/release-notes.md"
+
+          prerelease_flag=()
+          if [[ "${PRERELEASE}" == true ]]; then prerelease_flag+=(--prerelease); fi
+          gh release create "${NEXT_TAG}" dist/* \
+            --target "$(git rev-parse HEAD)" \
+            --title "${NEXT_TAG}" \
+            --notes-file "${RUNNER_TEMP}/release-notes.md" \
+            "${prerelease_flag[@]}"
+
+          jq -r '.[].number' "${RUNNER_TEMP}/pending-dependencies.json" | while read -r number; do
+            gh pr edit "${number}" --remove-label 'release:patch' --add-label 'release:published'
+          done

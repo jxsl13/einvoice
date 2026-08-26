@@ -7,6 +7,11 @@ production consumers Java-free.
 
 ## Pinned oracle baseline
 
+The machine-readable source of truth is
+[`.github/dependencies/parity.json`](.github/dependencies/parity.json). A weekly
+dependency job verifies the latest three release assets by SHA-256 and opens a
+protected auto-merge pull request whenever a pin changes.
+
 | Artifact | Version | SHA-256 |
 | --- | --- | --- |
 | [KoSIT Validator](https://github.com/itplr-kosit/validator/releases/tag/v1.6.3) | 1.6.3 standalone | `799e64befca97d4080e03608c80b85dd5a5ecc5f4ae4f35d1116ec2855b9a7c9` |

@@ -1,0 +1,126 @@
+name: Update parity reference toolchain
+
+on:
+  schedule:
+    - cron: '31 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Verify latest releases and show the manifest diff without opening a PR
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: parity-reference-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Verify and propose parity pins
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      - name: Resolve releases and verify asset digests
+        id: update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "${work}"' EXIT
+
+          resolve() {
+            local key="$1"
+            local repository="$2"
+            local asset_filter="$3"
+            local release asset digest actual url
+
+            release="$(gh api "repos/${repository}/releases/latest")"
+            asset="$(jq -cer --arg filter "${asset_filter}" \
+              '.assets[] | select(.name | test($filter))' <<<"${release}")"
+            digest="$(jq -r '.digest // ""' <<<"${asset}")"
+            if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "Missing trusted SHA-256 for ${repository}" >&2
+              exit 1
+            fi
+            url="$(jq -r '.browser_download_url' <<<"${asset}")"
+            curl --fail --location --silent --show-error \
+              --max-time 120 --output "${work}/${key}" "${url}"
+            actual="$(sha256sum "${work}/${key}" | cut -d ' ' -f 1)"
+            if [[ "${actual}" != "${digest#sha256:}" ]]; then
+              echo "Digest mismatch for ${repository}" >&2
+              exit 1
+            fi
+
+            jq -cn \
+              --arg repository "${repository}" \
+              --arg version "$(jq -r '.tag_name' <<<"${release}")" \
+              --arg asset "$(jq -r '.name' <<<"${asset}")" \
+              --arg url "${url}" \
+              --arg sha256 "${actual}" \
+              '{repository:$repository,version:$version,asset:$asset,url:$url,sha256:$sha256,license:"Apache-2.0"}'
+          }
+
+          validator="$(resolve validator itplr-kosit/validator 'standalone\.jar$')"
+          configuration="$(resolve configuration itplr-kosit/validator-configuration-xrechnung 'validator-configuration-.*\.zip$')"
+          schematron="$(resolve schematron itplr-kosit/xrechnung-schematron 'schematron-.*\.zip$')"
+
+          jq -Sn \
+            --argjson validator "${validator}" \
+            --argjson configuration "${configuration}" \
+            --argjson schematron "${schematron}" \
+            '{schemaVersion:1,dependencies:{kositValidator:$validator,xrechnungConfiguration:$configuration,xrechnungSchematron:$schematron}}' \
+            > .github/dependencies/parity.json
+          jq -e '.schemaVersion == 1 and (.dependencies | length == 3)' \
+            .github/dependencies/parity.json >/dev/null
+
+          if git diff --quiet -- .github/dependencies/parity.json; then
+            echo 'changed=false' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          echo 'changed=true' >> "${GITHUB_OUTPUT}"
+          git diff -- .github/dependencies/parity.json
+
+      - name: Stop after verified dry run
+        if: steps.update.outputs.changed == 'true' && inputs.dry_run == true
+        run: echo 'Dry run complete; no branch or pull request was created.'
+
+      - name: Open dependency pull request and arm protected auto-merge
+        if: steps.update.outputs.changed == 'true' && inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="automation/parity-reference-$(date -u +%Y%m%d%H%M%S)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "${branch}"
+          git add .github/dependencies/parity.json
+          git commit -m 'chore(deps): update parity reference toolchain'
+          git push origin "HEAD:${branch}"
+
+          gh label create dependencies --color 0366d6 \
+            --description 'Automated dependency update' --force
+          gh label create 'release:patch' --color 0e8a16 \
+            --description 'Publish a patch after protected merge' --force
+          pr_url="$(gh pr create \
+            --base main \
+            --head "${branch}" \
+            --title 'chore(deps): update parity reference toolchain' \
+            --label dependencies \
+            --label 'release:patch' \
+            --body 'Updates the checksum-verified, non-shipping KoSIT/XRechnung parity toolchain. The protected CI gate must pass before automatic squash merge.')"
+          gh workflow run ci.yml --ref "${branch}"
+          gh pr merge "${pr_url}" --auto --squash
