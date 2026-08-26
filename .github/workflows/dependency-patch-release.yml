@@ -1,4 +1,4 @@
-name: Dependency patch release
+name: Go dependency patch release
 
 on:
   pull_request_target:
@@ -15,12 +15,12 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: dependency-patch-release
+  group: go-dependency-patch-release
   cancel-in-progress: false
 
 jobs:
   release:
-    name: Gate and publish dependency patch
+    name: Gate and publish Go dependency patch
     if: >-
       github.event_name != 'pull_request_target' ||
       (github.event.pull_request.merged == true &&
@@ -35,35 +35,56 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Reconcile dependency releases after interrupted label updates
+      - name: Reconcile Go dependency releases after interrupted label updates
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           gh label create 'release:published' --color 5319e7 \
-            --description 'Included in an automated dependency patch release' --force
+            --description 'Included in an automated Go dependency patch release' --force
           gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' | \
             while read -r tag; do
               gh release view "${tag}" --json body --jq '.body' | \
-                sed -n 's/^Dependency-PR: #\([0-9][0-9]*\)$/\1/p' | \
+                sed -n 's/^Go-Dependency-PR: #\([0-9][0-9]*\)$/\1/p' | \
                 while read -r number; do
                   gh pr edit "${number}" --remove-label 'release:patch' \
                     --add-label 'release:published' >/dev/null 2>&1 || true
                 done
             done
 
-      - name: Find merged dependency updates awaiting release
+      - name: Find eligible Go dependency updates awaiting release
         id: pending
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          gh label create 'release:ineligible' --color b60205 \
+            --description 'Not eligible for an automated Go module release' --force
           gh pr list --state merged --label 'release:patch' --limit 100 \
             --json number,title,url,labels > "${RUNNER_TEMP}/merged-dependencies.json"
           jq '[.[] | select(any(.labels[]; .name == "release:published") | not)]' \
-            "${RUNNER_TEMP}/merged-dependencies.json" > "${RUNNER_TEMP}/pending-dependencies.json"
+            "${RUNNER_TEMP}/merged-dependencies.json" > "${RUNNER_TEMP}/release-candidates.json"
+
+          printf '[]\n' > "${RUNNER_TEMP}/pending-dependencies.json"
+          while read -r number; do
+            details="$(gh pr view "${number}" \
+              --json number,title,url,labels,author,files)"
+            if jq -e -f .github/release/go-module-update.jq \
+              <<<"${details}" >/dev/null; then
+              jq --argjson pr "${details}" '. + [$pr]' \
+                "${RUNNER_TEMP}/pending-dependencies.json" \
+                > "${RUNNER_TEMP}/pending-dependencies.next.json"
+              mv "${RUNNER_TEMP}/pending-dependencies.next.json" \
+                "${RUNNER_TEMP}/pending-dependencies.json"
+            else
+              echo "::warning::PR #${number} is not an eligible Go module dependency update"
+              gh pr edit "${number}" --remove-label 'release:patch' \
+                --add-label 'release:ineligible'
+            fi
+          done < <(jq -r '.[].number' "${RUNNER_TEMP}/release-candidates.json")
+
           count="$(jq 'length' "${RUNNER_TEMP}/pending-dependencies.json")"
           echo "count=${count}" >> "${GITHUB_OUTPUT}"
           jq -r '.[] | "- #\(.number) \(.title)"' \
@@ -170,13 +191,13 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo 'Automated dependency-only patch release from protected main.'
+            echo 'Automated Go module dependency-only patch release from protected main.'
             echo
             cat "${RUNNER_TEMP}/dependency-notes.md"
             echo
             echo 'This release does not change the documented fiscal-conformance status.'
             echo
-            jq -r '.[] | "Dependency-PR: #\(.number)"' \
+            jq -r '.[] | "Go-Dependency-PR: #\(.number)"' \
               "${RUNNER_TEMP}/pending-dependencies.json"
           } > "${RUNNER_TEMP}/release-notes.md"
 

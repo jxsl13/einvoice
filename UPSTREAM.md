@@ -39,10 +39,12 @@ history, BSD-3-Clause license, and notices are retained.
   a change.
 - Dependency pull requests are armed for squash auto-merge, but protected main
   merges them only after every required CI check passes.
-- Each merged dependency train reruns the release gate and increments only the
-  patch component. The release is blocked if any commit since the latest release
-  is not associated with a dependency-labeled pull request, so feature, minor,
-  and major releases stay manual.
+- Only merged Dependabot Go-module updates limited to `go.mod` and `go.sum`
+  trigger the release gate and increment the patch component. GitHub Actions,
+  KoSIT Validator, XRechnung configuration, and Schematron updates never create
+  a module tag or release. The release is blocked if any commit since the latest
+  release is not associated with a dependency-labeled pull request, so feature,
+  minor, and major releases stay manual.
 - The hourly release reconciler catches a bot-created pull request even when a
   GitHub token suppresses recursive workflow events.
 

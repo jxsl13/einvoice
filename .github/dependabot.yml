@@ -24,7 +24,6 @@ updates:
       timezone: "Europe/Berlin"
     labels:
       - "dependencies"
-      - "release:patch"
     groups:
       workflow-dependencies:
         patterns:

@@ -113,14 +113,11 @@ jobs:
 
           gh label create dependencies --color 0366d6 \
             --description 'Automated dependency update' --force
-          gh label create 'release:patch' --color 0e8a16 \
-            --description 'Publish a patch after protected merge' --force
           pr_url="$(gh pr create \
             --base main \
             --head "${branch}" \
             --title 'chore(deps): update parity reference toolchain' \
             --label dependencies \
-            --label 'release:patch' \
-            --body 'Updates the checksum-verified, non-shipping KoSIT/XRechnung parity toolchain. The protected CI gate must pass before automatic squash merge.')"
+            --body 'Updates the checksum-verified, non-shipping KoSIT/XRechnung parity toolchain. The protected CI gate must pass before automatic squash merge. Toolchain updates never publish module releases.')"
           gh workflow run ci.yml --ref "${branch}"
           gh pr merge "${pr_url}" --auto --squash
