@@ -43,8 +43,8 @@ jobs:
     - name: Run tests
       shell: bash
       run: |
-        mapfile -t packages < <(go list ./... | grep -v -E '/cmd/|/rules$')
-        go test -v -race -coverprofile=coverage.txt -covermode=atomic "${packages[@]}"
+        go list ./... | grep -v -E '/cmd/|/rules$' | \
+          xargs go test -v -race -coverprofile=coverage.txt -covermode=atomic
 
     - name: Enforce production-package coverage floor
       if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.25'
