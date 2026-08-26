@@ -137,6 +137,7 @@ func (inv *Invoice) validateGerman() {
 
 	hasRelevantTaxCode := false
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if relevantTaxCodes[inv.InvoiceLines[i].TaxCategoryCode] {
 			hasRelevantTaxCode = true
 			break
@@ -144,6 +145,7 @@ func (inv *Invoice) validateGerman() {
 	}
 	if !hasRelevantTaxCode {
 		for i := range inv.SpecifiedTradeAllowanceCharge {
+			inv.checkContext()
 			if relevantTaxCodes[inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode] {
 				hasRelevantTaxCode = true
 				break
@@ -171,6 +173,7 @@ func (inv *Invoice) validateGerman() {
 	// BR-DE-23, BR-DE-24, BR-DE-25: Payment means requirements
 	// These rules ensure mutual exclusivity of payment means groups (BG-17, BG-18, BG-19)
 	for i := range inv.PaymentMeans {
+		inv.checkContext()
 		// Determine which payment information groups are present
 		hasBG17CreditTransfer := inv.PaymentMeans[i].PayeePartyCreditorFinancialAccountIBAN != "" ||
 			inv.PaymentMeans[i].PayeePartyCreditorFinancialAccountProprietaryID != ""

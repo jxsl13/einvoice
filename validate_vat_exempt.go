@@ -22,6 +22,7 @@ func (inv *Invoice) validateVATExempt() {
 	// If invoice has line/allowance/charge with "E", must have at least one "E" in VAT breakdown
 	hasExempt := false
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "E" {
 			hasExempt = true
 			break
@@ -29,6 +30,7 @@ func (inv *Invoice) validateVATExempt() {
 	}
 	if !hasExempt {
 		for i := range inv.SpecifiedTradeAllowanceCharge {
+			inv.checkContext()
 			if inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "E" {
 				hasExempt = true
 				break
@@ -38,6 +40,7 @@ func (inv *Invoice) validateVATExempt() {
 	if hasExempt {
 		hasEInBreakdown := false
 		for i := range inv.TradeTaxes {
+			inv.checkContext()
 			if inv.TradeTaxes[i].CategoryCode == "E" {
 				hasEInBreakdown = true
 				break
@@ -52,6 +55,7 @@ func (inv *Invoice) validateVATExempt() {
 	// If invoice line has "E", must have seller VAT ID or tax registration or representative VAT ID
 	hasELine := false
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "E" {
 			hasELine = true
 			break
@@ -70,6 +74,7 @@ func (inv *Invoice) validateVATExempt() {
 	// If document level allowance has "E", must have seller tax ID
 	hasEAllowance := false
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if !inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "E" {
 			hasEAllowance = true
 			break
@@ -88,6 +93,7 @@ func (inv *Invoice) validateVATExempt() {
 	// If document level charge has "E", must have seller tax ID
 	hasECharge := false
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "E" {
 			hasECharge = true
 			break
@@ -105,6 +111,7 @@ func (inv *Invoice) validateVATExempt() {
 	// BR-E-5 Steuerbefreit
 	// In invoice line with "E", VAT rate must be 0
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "E" && !inv.InvoiceLines[i].TaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRE5, "Exempt from VAT invoice line must have VAT rate of 0")
 		}
@@ -113,6 +120,7 @@ func (inv *Invoice) validateVATExempt() {
 	// BR-E-6 Steuerbefreit
 	// In document level allowance with "E", VAT rate must be 0
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if !inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "E" && !inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRE6, "Exempt from VAT allowance must have VAT rate of 0")
 		}
@@ -121,6 +129,7 @@ func (inv *Invoice) validateVATExempt() {
 	// BR-E-7 Steuerbefreit
 	// In document level charge with "E", VAT rate must be 0
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "E" && !inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRE7, "Exempt from VAT charge must have VAT rate of 0")
 		}
@@ -132,6 +141,7 @@ func (inv *Invoice) validateVATExempt() {
 	// BasicWL profile (level 2) provides BasisAmount directly without line items.
 	if inv.ProfileLevel() >= levelBasic || (inv.ProfileLevel() == 0 && len(inv.InvoiceLines) > 0) {
 		for i := range inv.TradeTaxes {
+			inv.checkContext()
 			if inv.TradeTaxes[i].CategoryCode == "E" {
 				// Sub invoice line aggregation lines (GROUP / INFORMATION) are
 				// excluded so they are not double counted (EXTENDED). In the
@@ -146,6 +156,7 @@ func (inv *Invoice) validateVATExempt() {
 	// BR-E-9 Steuerbefreit
 	// VAT amount must be 0 for Exempt from VAT
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "E" && !inv.TradeTaxes[i].CalculatedAmount.IsZero() {
 			inv.addViolation(rules.BRE9, "Exempt from VAT amount must be 0")
 		}
@@ -154,6 +165,7 @@ func (inv *Invoice) validateVATExempt() {
 	// BR-E-10 Steuerbefreit
 	// Exempt from VAT breakdown must have exemption reason code or text
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "E" && inv.TradeTaxes[i].ExemptionReason == "" && inv.TradeTaxes[i].ExemptionReasonCode == "" {
 			inv.addViolation(rules.BRE10, "Exempt from VAT breakdown must have exemption reason")
 		}

@@ -29,6 +29,7 @@ func (inv *Invoice) sumDetailLineBasis(category string, rate decimal.Decimal, ma
 	basis := decimal.Zero
 	count := 0
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		line := &inv.InvoiceLines[i]
 		if !line.isDetailLine() || line.TaxCategoryCode != category {
 			continue
@@ -40,6 +41,7 @@ func (inv *Invoice) sumDetailLineBasis(category string, rate decimal.Decimal, ma
 		count++
 	}
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		ac := &inv.SpecifiedTradeAllowanceCharge[i]
 		if ac.CategoryTradeTaxCategoryCode != category {
 			continue

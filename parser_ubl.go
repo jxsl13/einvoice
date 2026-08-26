@@ -1,6 +1,7 @@
 package einvoice
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"time"
@@ -33,8 +34,9 @@ func parseTimeUBL(ctx *cxpath.Context, path string) (time.Time, error) {
 
 // parseUBL parses a UBL 2.1 Invoice or CreditNote document into an Invoice struct.
 // Both document types are mapped to the same Invoice struct, differentiated by InvoiceTypeCode.
-func parseUBL(ctx *cxpath.Context) (*Invoice, error) {
-	inv := &Invoice{SchemaType: UBL}
+func parseUBL(operationCtx context.Context, ctx *cxpath.Context) (*Invoice, error) {
+	inv := &Invoice{SchemaType: UBL, operationContext: operationCtx}
+	inv.checkContext()
 
 	// Setup UBL namespaces
 	ctx.SetNamespace("inv", nsUBLInvoice)
@@ -58,34 +60,42 @@ func parseUBL(ctx *cxpath.Context) (*Invoice, error) {
 	if err := parseUBLHeader(root, inv, prefix); err != nil {
 		return nil, fmt.Errorf("parse UBL header: %w", err)
 	}
+	inv.checkContext()
 
 	if err := parseUBLParties(root, inv, prefix); err != nil {
 		return nil, fmt.Errorf("parse UBL parties: %w", err)
 	}
+	inv.checkContext()
 
 	if err := parseUBLAllowanceCharge(root, inv, prefix); err != nil {
 		return nil, fmt.Errorf("parse UBL allowances/charges: %w", err)
 	}
+	inv.checkContext()
 
 	if err := parseUBLTaxTotal(root, inv, prefix); err != nil {
 		return nil, fmt.Errorf("parse UBL tax total: %w", err)
 	}
+	inv.checkContext()
 
 	if err := parseUBLMonetarySummation(root, inv, prefix); err != nil {
 		return nil, fmt.Errorf("parse UBL monetary summation: %w", err)
 	}
+	inv.checkContext()
 
 	if err := parseUBLPaymentMeans(root, inv, prefix); err != nil {
 		return nil, fmt.Errorf("parse UBL payment means: %w", err)
 	}
+	inv.checkContext()
 
 	if err := parseUBLPaymentTerms(root, inv, prefix); err != nil {
 		return nil, fmt.Errorf("parse UBL payment terms: %w", err)
 	}
+	inv.checkContext()
 
 	if err := parseUBLLines(root, inv, prefix); err != nil {
 		return nil, fmt.Errorf("parse UBL lines: %w", err)
 	}
+	inv.checkContext()
 
 	return inv, nil
 }
@@ -160,6 +170,7 @@ func parseUBLHeader(root *cxpath.Context, inv *Invoice, prefix string) error {
 	if noteCount > 0 {
 		inv.Notes = make([]Note, 0, noteCount)
 		for note := range root.Each("cbc:Note") {
+			inv.checkContext()
 			inv.Notes = append(inv.Notes, Note{
 				Text: note.String(),
 				// UBL doesn't typically have subject codes in Note elements
@@ -172,6 +183,7 @@ func parseUBLHeader(root *cxpath.Context, inv *Invoice, prefix string) error {
 	if refCount > 0 {
 		inv.InvoiceReferencedDocument = make([]ReferencedDocument, 0, refCount)
 		for ref := range root.Each("cac:BillingReference/cac:InvoiceDocumentReference") {
+			inv.checkContext()
 			refDoc := ReferencedDocument{
 				ID: ref.Eval("cbc:ID").String(),
 			}
@@ -204,6 +216,7 @@ func parseUBLHeader(root *cxpath.Context, inv *Invoice, prefix string) error {
 	if docCount > 0 {
 		inv.AdditionalReferencedDocument = make([]Document, 0, docCount)
 		for doc := range root.Each("cac:AdditionalDocumentReference") {
+			inv.checkContext()
 			addDoc := Document{
 				IssuerAssignedID: doc.Eval("cbc:ID").String(),
 				TypeCode:         doc.Eval("cbc:DocumentTypeCode").String(),
@@ -377,6 +390,7 @@ func parseUBLAllowanceCharge(root *cxpath.Context, inv *Invoice, prefix string) 
 	if acCount > 0 {
 		inv.SpecifiedTradeAllowanceCharge = make([]AllowanceCharge, 0, acCount)
 		for ac := range root.Each("cac:AllowanceCharge") {
+			inv.checkContext()
 			chargeIndicator := ac.Eval("string(cbc:ChargeIndicator) = 'true'").Bool()
 
 			basisAmount, err := getDecimal(ac, "cbc:BaseAmount")
@@ -425,6 +439,7 @@ func parseUBLTaxTotal(root *cxpath.Context, inv *Invoice, prefix string) error {
 	// BT-110 and BT-111: Parse TaxTotal by matching currencyID (not position)
 	// EN 16931 specifies which currency each total must be in, regardless of XML order
 	for taxTotal := range root.Each("cac:TaxTotal") {
+		inv.checkContext()
 		currency := taxTotal.Eval("cbc:TaxAmount/@currencyID").String()
 		if currency == "" {
 			currency = inv.InvoiceCurrencyCode // Default if missing
@@ -455,6 +470,7 @@ func parseUBLTaxTotal(root *cxpath.Context, inv *Invoice, prefix string) error {
 	if taxSubtotalCount > 0 {
 		inv.TradeTaxes = make([]TradeTax, 0, taxSubtotalCount)
 		for subtotal := range root.Each("cac:TaxTotal/cac:TaxSubtotal") {
+			inv.checkContext()
 			tradeTax := TradeTax{}
 
 			tradeTax.BasisAmount, err = getDecimal(subtotal, "cbc:TaxableAmount")
@@ -558,6 +574,7 @@ func parseUBLPaymentMeans(root *cxpath.Context, inv *Invoice, prefix string) err
 	if pmCount > 0 {
 		inv.PaymentMeans = make([]PaymentMeans, 0, pmCount)
 		for pm := range root.Each("cac:PaymentMeans") {
+			inv.checkContext()
 			paymentMeans := PaymentMeans{
 				TypeCode:    pm.Eval("cbc:PaymentMeansCode").Int(),
 				Information: pm.Eval("cbc:InstructionNote").String(),
@@ -612,6 +629,7 @@ func parseUBLPaymentTerms(root *cxpath.Context, inv *Invoice, prefix string) err
 	if ptCount > 0 {
 		inv.SpecifiedTradePaymentTerms = make([]SpecifiedTradePaymentTerms, 0, ptCount)
 		for pt := range root.Each("cac:PaymentTerms") {
+			inv.checkContext()
 			paymentTerm := SpecifiedTradePaymentTerms{
 				Description: pt.Eval("cbc:Note").String(),
 			}
@@ -658,6 +676,7 @@ func parseUBLLines(root *cxpath.Context, inv *Invoice, prefix string) error {
 	}
 
 	for lineItem := range root.Each(lineElementName) {
+		inv.checkContext()
 		invoiceLine := InvoiceLine{}
 		var err error
 
@@ -726,6 +745,7 @@ func parseUBLLines(root *cxpath.Context, inv *Invoice, prefix string) error {
 			invoiceLine.InvoiceLineAllowances = make([]AllowanceCharge, 0, lineACCount)
 			invoiceLine.InvoiceLineCharges = make([]AllowanceCharge, 0, lineACCount)
 			for ac := range lineItem.Each("cac:AllowanceCharge") {
+				inv.checkContext()
 				chargeIndicator := ac.Eval("string(cbc:ChargeIndicator) = 'true'").Bool()
 
 				basisAmount, err := getDecimal(ac, "cbc:BaseAmount")

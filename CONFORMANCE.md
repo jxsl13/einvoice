@@ -58,6 +58,22 @@ Every gate is blocking:
 
 The current 90% CI floor is a bootstrap floor, not the production threshold.
 
+## Current implementation progress
+
+The project now exposes a `validator` package with a context-aware API, typed
+operational errors, deterministic localization-neutral findings, an explicitly
+non-authoritative `bootstrap-0` rule pack, and pre-parse ceilings for bytes,
+depth, element count, attributes, text nodes, and returned findings. It rejects
+DTD directives, non-declaration processing instructions, XInclude, unknown
+roots, duplicate profile declarations, unsupported profiles, and unsupported
+rule packs before business-rule validation. Hostile-input tests, race tests,
+and a dedicated fuzz target cover this boundary.
+
+This completes only the API and initial resource-boundary portion of the
+roadmap. It does not satisfy rule inventory, witness, mutation, differential
+parity, false-accept, provenance, supply-chain, or adviser-acceptance gates and
+does not change the module's fiscal-conformance status.
+
 ## Implementation sequence
 
 1. Add a bounded context-aware validation API and deterministic typed findings.

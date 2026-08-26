@@ -1,6 +1,7 @@
 package einvoice
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -391,6 +392,10 @@ type Invoice struct {
 
 	violations []SemanticError // Private field - use Validate() and check error instead
 	warnings   []SemanticError // Private field - use Warnings() accessor
+
+	// operationContext is set only while context-aware validation is running.
+	// Invoice validation already mutates private state and is not concurrent-safe.
+	operationContext context.Context
 }
 
 // Profile helper methods for Invoice

@@ -1,6 +1,7 @@
 package einvoice
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -140,6 +141,7 @@ func (e *ValidationError) HasRuleCode(code string) bool {
 //	    "Invoice total VAT amount %s does not match sum %s",
 //	    inv.TaxTotal.String(), calculatedTaxTotal.String()))
 func (inv *Invoice) addViolation(rule rules.Rule, text string) {
+	inv.checkContext()
 	inv.violations = append(inv.violations, SemanticError{
 		Rule: rule,
 		Text: text,
@@ -154,6 +156,7 @@ func (inv *Invoice) addViolation(rule rules.Rule, text string) {
 //
 //	inv.addWarning(rules.BRDE27, "Seller contact telephone should contain at least three digits")
 func (inv *Invoice) addWarning(rule rules.Rule, text string) {
+	inv.checkContext()
 	inv.warnings = append(inv.warnings, SemanticError{
 		Rule: rule,
 		Text: text,
@@ -232,6 +235,30 @@ func (inv *Invoice) HasWarnings() bool {
 //	    }
 //	}
 func (inv *Invoice) Validate() error {
+	return inv.ValidateContext(context.Background())
+}
+
+// ValidateContext validates the invoice and stops when ctx is canceled.
+// Validate remains available for callers that do not need cancellation.
+func (inv *Invoice) ValidateContext(ctx context.Context) (err error) {
+	if ctx == nil {
+		return fmt.Errorf("einvoice: nil validation context")
+	}
+	inv.operationContext = ctx
+	defer func() {
+		inv.operationContext = nil
+		if recovered := recover(); recovered != nil {
+			if canceled, ok := recovered.(operationCanceled); ok {
+				inv.violations = nil
+				inv.warnings = nil
+				err = canceled.cause
+				return
+			}
+			panic(recovered)
+		}
+	}()
+	inv.checkContext()
+
 	// Always clear previous violations and warnings to ensure idempotency
 	inv.violations = []SemanticError{}
 	inv.warnings = []SemanticError{}
@@ -242,9 +269,13 @@ func (inv *Invoice) Validate() error {
 	shouldValidate := inv.SchemaType == SchemaTypeUnknown || inv.isEN16931Compliant()
 
 	if shouldValidate {
+		inv.checkContext()
 		inv.validateCore()
+		inv.checkContext()
 		inv.validateCalculations()
+		inv.checkContext()
 		inv.validateDecimals()
+		inv.checkContext()
 
 		// Auto-detect and run PEPPOL validation based on specification identifier
 		if inv.isPEPPOL() {
@@ -253,12 +284,14 @@ func (inv *Invoice) Validate() error {
 			// For non-PEPPOL invoices, still validate line calculations under BR-USER-05
 			inv.validateUserLineCalculations()
 		}
+		inv.checkContext()
 
 		// Auto-detect country-specific rules
 		// BR-DE-1 through BR-DE-31: Only for XRechnung invoices
 		if inv.isGerman() {
 			inv.validateGerman()
 		}
+		inv.checkContext()
 
 		// TODO: Implement additional country-specific validation rules for:
 		//   - Denmark (isDanish)
@@ -267,6 +300,7 @@ func (inv *Invoice) Validate() error {
 		//   - Norway (isNorwegian)
 		//   - Sweden (isSwedish)
 	}
+	inv.checkContext()
 
 	// Return error if violations exist (include warnings for convenience)
 	if len(inv.violations) > 0 {
@@ -279,6 +313,19 @@ func (inv *Invoice) Validate() error {
 	// No violations = success, even if warnings exist
 	// User can call inv.Warnings() to check for recommendations
 	return nil
+}
+
+type operationCanceled struct {
+	cause error
+}
+
+func (inv *Invoice) checkContext() {
+	if inv.operationContext == nil {
+		return
+	}
+	if err := inv.operationContext.Err(); err != nil {
+		panic(operationCanceled{cause: err})
+	}
 }
 
 // isEN16931Compliant checks if the invoice claims to be EN 16931 compliant

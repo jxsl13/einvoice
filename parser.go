@@ -1,6 +1,7 @@
 package einvoice
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -27,16 +28,47 @@ func getDecimal(ctx *cxpath.Context, eval string) (decimal.Decimal, error) {
 // It detects the format by examining the root element namespace and routes to the
 // appropriate parser. Each parser handles its own namespace setup.
 func ParseReader(r io.Reader) (*Invoice, error) {
-	ctx, err := cxpath.NewFromReader(r)
+	return ParseReaderContext(context.Background(), r)
+}
+
+// ParseReaderContext reads one XML invoice and stops when ctx is canceled.
+// ParseReader remains available for callers that do not need cancellation.
+func ParseReaderContext(operationCtx context.Context, r io.Reader) (inv *Invoice, err error) {
+	defer func() {
+		if inv != nil {
+			inv.operationContext = nil
+		}
+		if recovered := recover(); recovered != nil {
+			if canceled, ok := recovered.(operationCanceled); ok {
+				inv = nil
+				err = canceled.cause
+				return
+			}
+			panic(recovered)
+		}
+	}()
+
+	if operationCtx == nil || r == nil {
+		return nil, fmt.Errorf("einvoice: nil parse argument")
+	}
+	if err := operationCtx.Err(); err != nil {
+		return nil, err
+	}
+
+	xpathCtx, err := cxpath.NewFromReader(contextReader{ctx: operationCtx, src: r})
 	if err != nil {
+		if contextErr := operationCtx.Err(); contextErr != nil {
+			return nil, contextErr
+		}
 		return nil, fmt.Errorf("cannot read from reader: %w", err)
+	}
+	if err := operationCtx.Err(); err != nil {
+		return nil, err
 	}
 
 	// Detect format by checking root element namespace
-	root := ctx.Root()
+	root := xpathCtx.Root()
 	rootns := root.Eval("namespace-uri()").String()
-
-	var inv *Invoice
 
 	switch rootns {
 	case "":
@@ -44,14 +76,14 @@ func ParseReader(r io.Reader) (*Invoice, error) {
 
 	// CII format (ZUGFeRD/Factur-X)
 	case nsCIIRootInvoice:
-		inv, err = parseCII(ctx)
+		inv, err = parseCII(operationCtx, xpathCtx)
 		if err != nil {
 			return nil, fmt.Errorf("parse CII: %w", err)
 		}
 
 	// UBL format (Invoice or CreditNote)
 	case nsUBLInvoice, nsUBLCreditNote:
-		inv, err = parseUBL(ctx)
+		inv, err = parseUBL(operationCtx, xpathCtx)
 		if err != nil {
 			return nil, fmt.Errorf("parse UBL: %w", err)
 		}
@@ -59,9 +91,24 @@ func ParseReader(r io.Reader) (*Invoice, error) {
 	default:
 		return nil, fmt.Errorf("unknown root element namespace: %s", rootns)
 	}
+	if contextErr := operationCtx.Err(); contextErr != nil {
+		return nil, contextErr
+	}
 
 	inv.isParsed = true
 	return inv, nil
+}
+
+type contextReader struct {
+	ctx context.Context
+	src io.Reader
+}
+
+func (r contextReader) Read(buffer []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.src.Read(buffer)
 }
 
 // ParseXMLFile reads the XML file at filename.

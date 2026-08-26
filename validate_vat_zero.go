@@ -22,6 +22,7 @@ func (inv *Invoice) validateVATZero() {
 	// If invoice has line/allowance/charge with "Z", must have at least one "Z" in VAT breakdown
 	hasZeroRated := false
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "Z" {
 			hasZeroRated = true
 			break
@@ -29,6 +30,7 @@ func (inv *Invoice) validateVATZero() {
 	}
 	if !hasZeroRated {
 		for i := range inv.SpecifiedTradeAllowanceCharge {
+			inv.checkContext()
 			if inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "Z" {
 				hasZeroRated = true
 				break
@@ -38,6 +40,7 @@ func (inv *Invoice) validateVATZero() {
 	if hasZeroRated {
 		hasZInBreakdown := false
 		for i := range inv.TradeTaxes {
+			inv.checkContext()
 			if inv.TradeTaxes[i].CategoryCode == "Z" {
 				hasZInBreakdown = true
 				break
@@ -52,6 +55,7 @@ func (inv *Invoice) validateVATZero() {
 	// If invoice line has "Z", must have seller VAT ID or tax registration or representative VAT ID
 	hasZLine := false
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "Z" {
 			hasZLine = true
 			break
@@ -70,6 +74,7 @@ func (inv *Invoice) validateVATZero() {
 	// If document level allowance has "Z", must have seller tax ID
 	hasZAllowance := false
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if !inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "Z" {
 			hasZAllowance = true
 			break
@@ -88,6 +93,7 @@ func (inv *Invoice) validateVATZero() {
 	// If document level charge has "Z", must have seller tax ID
 	hasZCharge := false
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "Z" {
 			hasZCharge = true
 			break
@@ -105,6 +111,7 @@ func (inv *Invoice) validateVATZero() {
 	// BR-Z-5 Umsatzsteuer mit Nullsatz
 	// In invoice line with "Z", VAT rate must be 0
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "Z" && !inv.InvoiceLines[i].TaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRZ5, "Zero rated invoice line must have VAT rate of 0")
 		}
@@ -113,6 +120,7 @@ func (inv *Invoice) validateVATZero() {
 	// BR-Z-6 Umsatzsteuer mit Nullsatz
 	// In document level allowance with "Z", VAT rate must be 0
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if !inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "Z" && !inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRZ6, "Zero rated allowance must have VAT rate of 0")
 		}
@@ -121,6 +129,7 @@ func (inv *Invoice) validateVATZero() {
 	// BR-Z-7 Umsatzsteuer mit Nullsatz
 	// In document level charge with "Z", VAT rate must be 0
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "Z" && !inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRZ7, "Zero rated charge must have VAT rate of 0")
 		}
@@ -132,6 +141,7 @@ func (inv *Invoice) validateVATZero() {
 	// BasicWL profile (level 2) provides BasisAmount directly without line items.
 	if inv.ProfileLevel() >= levelBasic || (inv.ProfileLevel() == 0 && len(inv.InvoiceLines) > 0) {
 		for i := range inv.TradeTaxes {
+			inv.checkContext()
 			if inv.TradeTaxes[i].CategoryCode == "Z" {
 				// Sub invoice line aggregation lines (GROUP / INFORMATION) are
 				// excluded so they are not double counted (EXTENDED). In the
@@ -146,6 +156,7 @@ func (inv *Invoice) validateVATZero() {
 	// BR-Z-9 Umsatzsteuer mit Nullsatz
 	// VAT amount must be 0 for Zero rated
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "Z" && !inv.TradeTaxes[i].CalculatedAmount.IsZero() {
 			inv.addViolation(rules.BRZ9, "Zero rated VAT amount must be 0")
 		}
@@ -154,6 +165,7 @@ func (inv *Invoice) validateVATZero() {
 	// BR-Z-10 Umsatzsteuer mit Nullsatz
 	// Zero rated breakdown must not have exemption reason code or text
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "Z" && (inv.TradeTaxes[i].ExemptionReason != "" || inv.TradeTaxes[i].ExemptionReasonCode != "") {
 			inv.addViolation(rules.BRZ10, "Zero rated VAT breakdown must not have exemption reason")
 		}

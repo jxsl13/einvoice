@@ -26,6 +26,7 @@ func (inv *Invoice) validateVATIGIC() {
 	// Invoice with category L must have seller VAT ID
 	hasIGIC := false
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "L" {
 			hasIGIC = true
 			break
@@ -33,6 +34,7 @@ func (inv *Invoice) validateVATIGIC() {
 	}
 	if !hasIGIC {
 		for i := range inv.SpecifiedTradeAllowanceCharge {
+			inv.checkContext()
 			if inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "L" {
 				hasIGIC = true
 				break
@@ -63,6 +65,7 @@ func (inv *Invoice) validateVATIGIC() {
 	// BasicWL profile (level 2) provides BasisAmount directly without line items.
 	if inv.ProfileLevel() >= levelBasic || (inv.ProfileLevel() == 0 && len(inv.InvoiceLines) > 0) {
 		for i := range inv.TradeTaxes {
+			inv.checkContext()
 			if inv.TradeTaxes[i].CategoryCode == "L" {
 				// Detail lines only; aggregation lines (GROUP / INFORMATION) are
 				// excluded so they are not double counted (EXTENDED).
@@ -77,6 +80,7 @@ func (inv *Invoice) validateVATIGIC() {
 	// BR-AF-6 IGIC
 	// VAT amount must equal basis * rate
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "L" {
 			expectedVAT := roundHalfUp(inv.TradeTaxes[i].BasisAmount.Mul(inv.TradeTaxes[i].Percent).Div(decimal100), 2)
 			if !inv.TradeTaxes[i].CalculatedAmount.Equal(expectedVAT) {
@@ -91,6 +95,7 @@ func (inv *Invoice) validateVATIGIC() {
 	// BasicWL profile (level 2) provides BasisAmount directly without line items.
 	if inv.ProfileLevel() >= levelBasic || (inv.ProfileLevel() == 0 && len(inv.InvoiceLines) > 0) {
 		for i := range inv.TradeTaxes {
+			inv.checkContext()
 			if inv.TradeTaxes[i].CategoryCode == "L" {
 				// Detail lines only; aggregation lines (GROUP / INFORMATION) are
 				// excluded so they are not double counted (EXTENDED).
@@ -105,6 +110,7 @@ func (inv *Invoice) validateVATIGIC() {
 	// BR-AF-8 IGIC
 	// For each different VAT rate, verify VAT amount calculation
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "L" {
 			expectedVAT := roundHalfUp(inv.TradeTaxes[i].BasisAmount.Mul(inv.TradeTaxes[i].Percent).Div(decimal100), 2)
 			if !inv.TradeTaxes[i].CalculatedAmount.Equal(expectedVAT) {
@@ -116,6 +122,7 @@ func (inv *Invoice) validateVATIGIC() {
 	// BR-AF-9 IGIC
 	// IGIC breakdown must NOT have exemption reason
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "L" && (inv.TradeTaxes[i].ExemptionReason != "" || inv.TradeTaxes[i].ExemptionReasonCode != "") {
 			inv.addViolation(rules.BRAF9, "IGIC VAT breakdown must not have exemption reason")
 		}
@@ -125,6 +132,7 @@ func (inv *Invoice) validateVATIGIC() {
 	// Must have seller tax ID and must NOT have buyer VAT ID
 	hasIGICInVATBreakdown := false
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "L" {
 			hasIGICInVATBreakdown = true
 			break

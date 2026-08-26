@@ -116,6 +116,7 @@ func (inv *Invoice) validateLineCalculations(
 	report func(rule rules.Rule, text string),
 ) {
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		// Create line reference for error messages
 		lineRef := inv.InvoiceLines[i].LineID
 		if lineRef == "" {
@@ -153,6 +154,7 @@ func (inv *Invoice) validateLineCalculations(
 		// Add line-level charges (BG-28)
 		chargeTotal := decimal.Zero
 		for j := range inv.InvoiceLines[i].InvoiceLineCharges {
+			inv.checkContext()
 			calculated = calculated.Add(inv.InvoiceLines[i].InvoiceLineCharges[j].ActualAmount)
 			chargeTotal = chargeTotal.Add(inv.InvoiceLines[i].InvoiceLineCharges[j].ActualAmount)
 		}
@@ -160,6 +162,7 @@ func (inv *Invoice) validateLineCalculations(
 		// Subtract line-level allowances (BG-27)
 		allowanceTotal := decimal.Zero
 		for j := range inv.InvoiceLines[i].InvoiceLineAllowances {
+			inv.checkContext()
 			calculated = calculated.Sub(inv.InvoiceLines[i].InvoiceLineAllowances[j].ActualAmount)
 			allowanceTotal = allowanceTotal.Add(inv.InvoiceLines[i].InvoiceLineAllowances[j].ActualAmount)
 		}
