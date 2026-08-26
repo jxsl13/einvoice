@@ -35,8 +35,9 @@
   },
   "embeddedSchemas": {
     "archive": "internal/xsdvalidate/schemas.zip",
-    "sha256": "dfdf5d74870a0c0c2bb8e8117e3aaba8616b23405ffff533f4243fd8be4d9c91",
+    "sha256": "6cb04c5976d9ab5651d38fd7af9bd84877176bb5c5cbe2076844a65b5a9295dd",
     "manifest": "internal/xsdvalidate/schemas.json",
+    "generatorGoVersion": "1.26.2",
     "externalResolution": false
   },
   "gates": {
