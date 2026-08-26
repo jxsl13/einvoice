@@ -1,16 +1,26 @@
-[![Go Reference](https://pkg.go.dev/badge/github.com/speedata/einvoice.svg)](https://pkg.go.dev/github.com/speedata/einvoice)
-[![Go Report Card](https://goreportcard.com/badge/github.com/speedata/einvoice)](https://goreportcard.com/report/github.com/speedata/einvoice)
-[![Releases](https://img.shields.io/github/v/release/speedata/einvoice?include_prereleases)](https://github.com/speedata/einvoice/releases/latest)
+[![Go Reference](https://pkg.go.dev/badge/github.com/jxsl13/einvoice.svg)](https://pkg.go.dev/github.com/jxsl13/einvoice)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jxsl13/einvoice)](https://goreportcard.com/report/github.com/jxsl13/einvoice)
+[![Releases](https://img.shields.io/github/v/release/jxsl13/einvoice?include_prereleases)](https://github.com/jxsl13/einvoice/releases/latest)
 
 # einvoice - a Go library to read, write and verify electronic invoices
 
 **Work in progress**
 
+This is the public Hugo Studio fork of
+[speedata/einvoice](https://github.com/speedata/einvoice). It retains the
+upstream history and BSD-3-Clause attribution while using the independent Go
+module path `github.com/jxsl13/einvoice`. See [UPSTREAM.md](UPSTREAM.md) for the
+sync and release policy.
+
+No release is authoritative for German fiscal issuance until its published
+conformance report satisfies the rule-coverage and KoSIT parity gates. Java is
+never part of the module, its release assets, or consuming production systems.
+
 This library will be used to read, write and verify electronic invoices (XML) which conform to the EN 16931 standard.
 
 ## Installation
 
-    go get github.com/speedata/einvoice
+    go get github.com/jxsl13/einvoice
 
 ## Usage
 
@@ -126,7 +136,7 @@ if err == nil {
 
 The warning infrastructure is available for future "should" (German: "soll") rules from various CIUS specifications.
 
-There is a [dedicated example](https://pkg.go.dev/github.com/speedata/einvoice#example-Invoice.Write) in [the documentation](https://pkg.go.dev/github.com/speedata/einvoice).
+There is a [dedicated example](https://pkg.go.dev/github.com/jxsl13/einvoice#example-Invoice.Write) in [the documentation](https://pkg.go.dev/github.com/jxsl13/einvoice).
 
 ## Command Line Tool
 
@@ -135,7 +145,7 @@ A CLI tool is available for validating invoices from the command line.
 ### Installation
 
 ```bash
-go install github.com/speedata/einvoice/cmd/einvoice@latest
+go install github.com/jxsl13/einvoice/cmd/einvoice@latest
 ```
 
 ### Usage
@@ -200,4 +210,3 @@ Test fixtures are organized by profile and format in the [testdata/](testdata/) 
 - Fixture sources and provenance (from official EN 16931 and PEPPOL test suites)
 - How to add new fixtures
 - Usage patterns in tests
-

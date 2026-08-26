@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/speedata/einvoice"
+	"github.com/jxsl13/einvoice"
 )
 
 // Result represents the validation result for JSON output

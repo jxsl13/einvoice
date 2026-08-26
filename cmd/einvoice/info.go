@@ -10,8 +10,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/speedata/einvoice"
-	"github.com/speedata/einvoice/pkg/codelists"
+	"github.com/jxsl13/einvoice"
+	"github.com/jxsl13/einvoice/pkg/codelists"
 	"golang.org/x/term"
 )
 

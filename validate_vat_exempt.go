@@ -1,8 +1,8 @@
 package einvoice
 
 import (
+	"github.com/jxsl13/einvoice/rules"
 	"github.com/shopspring/decimal"
-	"github.com/speedata/einvoice/rules"
 )
 
 // validateVATExempt validates BR-E-1 through BR-E-10.

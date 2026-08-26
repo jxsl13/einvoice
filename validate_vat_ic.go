@@ -3,8 +3,8 @@ package einvoice
 import (
 	"fmt"
 
+	"github.com/jxsl13/einvoice/rules"
 	"github.com/shopspring/decimal"
-	"github.com/speedata/einvoice/rules"
 )
 
 // validateVATIntracommunity validates BR-IC-1 through BR-IC-12.

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/speedata/einvoice/rules"
+	"github.com/jxsl13/einvoice/rules"
 )
 
 // validateGerman performs German XRechnung-specific business rule validation.

@@ -415,7 +415,7 @@ Examples:
     --package myrules \
     --output myrules/rules.go
 
-Source: https://github.com/speedata/einvoice
+Source: https://github.com/jxsl13/einvoice
 `, version)
 }
 

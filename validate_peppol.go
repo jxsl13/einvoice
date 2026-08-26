@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/jxsl13/einvoice/rules"
 	"github.com/shopspring/decimal"
-	"github.com/speedata/einvoice/rules"
 )
 
 // validatePEPPOL validates the invoice against PEPPOL BIS Billing 3.0 rules.

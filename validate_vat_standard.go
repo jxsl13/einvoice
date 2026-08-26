@@ -3,7 +3,7 @@ package einvoice
 import (
 	"fmt"
 
-	"github.com/speedata/einvoice/rules"
+	"github.com/jxsl13/einvoice/rules"
 )
 
 // validateVATStandard validates BR-S-1 through BR-S-10.

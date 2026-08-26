@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/speedata/einvoice"
+	"github.com/jxsl13/einvoice"
 )
 
 // parseInvoiceFile parses an invoice from an XML file or ZUGFeRD/Factur-X PDF.

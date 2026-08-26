@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jxsl13/einvoice/rules"
 	"github.com/shopspring/decimal"
-	"github.com/speedata/einvoice/rules"
 )
 
 func TestValidationError_Error(t *testing.T) {

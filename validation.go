@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/speedata/einvoice/rules"
+	"github.com/jxsl13/einvoice/rules"
 )
 
 // SemanticError contains a business rule violation found during validation.

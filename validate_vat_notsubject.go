@@ -3,8 +3,8 @@ package einvoice
 import (
 	"fmt"
 
+	"github.com/jxsl13/einvoice/rules"
 	"github.com/shopspring/decimal"
-	"github.com/speedata/einvoice/rules"
 )
 
 // validateVATNotSubject validates BR-O-01 through BR-O-14.

@@ -3,8 +3,8 @@ package einvoice
 import (
 	"fmt"
 
+	"github.com/jxsl13/einvoice/rules"
 	"github.com/shopspring/decimal"
-	"github.com/speedata/einvoice/rules"
 )
 
 // validateVATIGIC validates BR-AF-1 through BR-AF-10.

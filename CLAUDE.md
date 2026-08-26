@@ -27,7 +27,7 @@ go test -cover
 ```bash
 # This is a library package, not a standalone binary
 # To use it in another project:
-go get github.com/speedata/einvoice
+go get github.com/jxsl13/einvoice
 ```
 
 ## Architecture

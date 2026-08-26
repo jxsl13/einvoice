@@ -3,8 +3,8 @@ package einvoice
 import (
 	"testing"
 
+	"github.com/jxsl13/einvoice/rules"
 	"github.com/shopspring/decimal"
-	"github.com/speedata/einvoice/rules"
 )
 
 // TestGermanValidation_BRDE1_PaymentInstructions tests BR-DE-1:

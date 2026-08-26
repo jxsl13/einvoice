@@ -1,4 +1,4 @@
-module github.com/speedata/einvoice
+module github.com/jxsl13/einvoice
 
 go 1.25.0
 
