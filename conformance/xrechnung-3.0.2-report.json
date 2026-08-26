@@ -37,7 +37,7 @@
     "archive": "internal/xsdvalidate/schemas.zip",
     "sha256": "6cb04c5976d9ab5651d38fd7af9bd84877176bb5c5cbe2076844a65b5a9295dd",
     "manifest": "internal/xsdvalidate/schemas.json",
-    "generatorGoVersion": "1.26.2",
+    "generatorGoVersion": "1.26.6",
     "externalResolution": false
   },
   "gates": {

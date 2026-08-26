@@ -22,7 +22,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.26.2'
+        go-version: '1.26.6'
         cache: true
 
     - name: Download checksum-pinned Schematron source archive
@@ -55,7 +55,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.26.2'
+        go-version: '1.26.6'
         cache: true
 
     - name: Download and verify the non-shipping oracle toolchain
@@ -196,7 +196,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.26.2', 'stable']
+        go-version: ['1.26.6', 'stable']
 
     steps:
     - name: Checkout code
@@ -221,7 +221,7 @@ jobs:
           xargs go test -v -race -coverprofile=coverage.txt -covermode=atomic
 
     - name: Enforce production-package coverage floor
-      if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.26.2'
+      if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.26.6'
       shell: bash
       run: |
         coverage="$(go tool cover -func=coverage.txt | awk '/^total:/ {gsub(/%/, "", $3); print $3}')"
@@ -245,7 +245,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.26.2'
+        go-version: '1.26.6'
 
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
@@ -264,7 +264,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.26.2'
+        go-version: '1.26.6'
         cache: true
 
     - name: Download dependencies
@@ -296,7 +296,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.26.2'
+        go-version: '1.26.6'
         cache: true
 
     - name: Download dependencies
@@ -316,7 +316,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.26.2'
+        go-version: '1.26.6'
         cache: true
 
     - name: Test automatic release eligibility policy
