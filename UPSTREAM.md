@@ -22,8 +22,8 @@ history, BSD-3-Clause license, and notices are retained.
   publish an SPDX SBOM, test coverage, rule-inventory coverage, corpus
   provenance, and KoSIT parity.
 - Pre-1.0 releases may change the API only through documented release notes.
-- Hugo Studio pins an exact released version and checksum behind a narrow
-  adapter; it never consumes an untagged branch or pseudo-version.
+- Downstream consumers should pin an exact released version and verify its
+  checksum; untagged branches and pseudo-versions are not supported releases.
 - A release is not approved for fiscal issuance unless its conformance report
   shows every enabled official rule ID, at least 95% Go statement coverage,
   at least 99.9% normalized KoSIT verdict parity, and zero false accepts for
@@ -52,3 +52,10 @@ Production code and all release assets contain zero Java source, bytecode,
 archives, runtimes, build tools, or commands. A pinned KoSIT Java validator may
 be used only by a separately isolated, non-shipping differential-test job. Its
 inputs and normalized outputs are test evidence, not module dependencies.
+
+## Project neutrality
+
+Repository documentation, release metadata, packages, tests, and automation do
+not identify or depend on downstream applications. Consumer-specific adapters,
+deployment instructions, and product policy belong in their respective
+repositories.
