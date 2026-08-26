@@ -95,6 +95,9 @@ jobs:
     - name: Run FuzzValidate
       run: go test -fuzz=FuzzValidate -fuzztime=30s
 
+    - name: Run bounded API fuzz tests
+      run: go test ./validator -fuzz=FuzzValidate -fuzztime=30s
+
     - name: Run FuzzRoundTrip
       run: go test -fuzz=FuzzRoundTrip -fuzztime=30s
 
