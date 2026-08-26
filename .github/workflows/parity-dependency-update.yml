@@ -96,7 +96,7 @@ jobs:
         if: steps.update.outputs.changed == 'true' && inputs.dry_run == true
         run: echo 'Dry run complete; no branch or pull request was created.'
 
-      - name: Open dependency pull request and arm protected auto-merge
+      - name: Open dependency pull request
         if: steps.update.outputs.changed == 'true' && inputs.dry_run != true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -118,6 +118,8 @@ jobs:
             --head "${branch}" \
             --title 'chore(deps): update parity reference toolchain' \
             --label dependencies \
-            --body 'Updates the checksum-verified, non-shipping KoSIT/XRechnung parity toolchain. The protected CI gate must pass before automatic squash merge. Toolchain updates never publish module releases.')"
+            --body 'Updates the checksum-verified, non-shipping KoSIT/XRechnung parity toolchain. The centralized dependency policy enables squash auto-merge only after protected CI passes. Toolchain updates never publish module releases.')"
           gh workflow run ci.yml --ref "${branch}"
-          gh pr merge "${pr_url}" --auto --squash
+          gh workflow run dependency-automerge.yml \
+            --ref main \
+            -f pull_request="${pr_url##*/}"
