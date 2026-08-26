@@ -1,6 +1,7 @@
 package einvoice
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"time"
@@ -88,7 +89,7 @@ func parseCIIParty(tradeParty *cxpath.Context) Party {
 
 // parseCII interprets the XML file as a ZUGFeRD or Factur-X cross industry invoice.
 // It sets up CII-specific namespaces and parses the document structure.
-func parseCII(ctx *cxpath.Context) (*Invoice, error) {
+func parseCII(operationCtx context.Context, ctx *cxpath.Context) (*Invoice, error) {
 	// Setup CII namespaces
 	ctx.SetNamespace("rsm", nsCIIRootInvoice)
 	ctx.SetNamespace("ram", "urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100")
@@ -98,20 +99,24 @@ func parseCII(ctx *cxpath.Context) (*Invoice, error) {
 	// Get root element after namespace setup
 	root := ctx.Root()
 
-	inv := &Invoice{SchemaType: CII}
+	inv := &Invoice{SchemaType: CII, operationContext: operationCtx}
+	inv.checkContext()
 
 	var err error
 	if err = parseCIIExchangedDocumentContext(root.Eval("rsm:ExchangedDocumentContext"), inv); err != nil {
 		return nil, err
 	}
+	inv.checkContext()
 
 	if err = parseCIIExchangedDocument(root.Eval("rsm:ExchangedDocument"), inv); err != nil {
 		return nil, err
 	}
+	inv.checkContext()
 
 	if err = parseCIISupplyChainTradeTransaction(root.Eval("rsm:SupplyChainTradeTransaction"), inv); err != nil {
 		return nil, err
 	}
+	inv.checkContext()
 
 	return inv, nil
 }
@@ -139,6 +144,7 @@ func parseCIIExchangedDocument(exchangedDocument *cxpath.Context, inv *Invoice) 
 	inv.InvoiceDate = invoiceDate
 
 	for note := range exchangedDocument.Each("ram:IncludedNote") {
+		inv.checkContext()
 		n := Note{}
 		n.SubjectCode = note.Eval("ram:SubjectCode").String()
 		n.Text = note.Eval("ram:Content").String()
@@ -152,6 +158,7 @@ func parseCIISupplyChainTradeTransaction(supplyChainTradeTransaction *cxpath.Con
 	var err error
 	// BG-25
 	for lineItem := range supplyChainTradeTransaction.Each("ram:IncludedSupplyChainTradeLineItem") {
+		inv.checkContext()
 		invoiceLine := InvoiceLine{}
 		invoiceLine.LineID = lineItem.Eval("ram:AssociatedDocumentLineDocument/ram:LineID").String()
 		invoiceLine.ParentLineID = lineItem.Eval("ram:AssociatedDocumentLineDocument/ram:ParentLineID").String()
@@ -178,6 +185,7 @@ func parseCIISupplyChainTradeTransaction(supplyChainTradeTransaction *cxpath.Con
 		}
 
 		for allowanceCharge := range lineItem.Each("ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeAllowanceCharge") {
+			inv.checkContext()
 			basisAmount, err := getDecimal(allowanceCharge, "ram:BasisAmount")
 			if err != nil {
 				return err
@@ -273,6 +281,7 @@ func parseCIIApplicableHeaderTradeAgreement(applicableHeaderTradeAgreement *cxpa
 	inv.SellerOrderReferencedDocument = applicableHeaderTradeAgreement.Eval("ram:SellerOrderReferencedDocument/ram:IssuerAssignedID").String()
 
 	for additionalDocument := range applicableHeaderTradeAgreement.Each("ram:AdditionalReferencedDocument") {
+		inv.checkContext()
 		doc := Document{}
 		doc.IssuerAssignedID = additionalDocument.Eval("ram:IssuerAssignedID").String()
 		encoded := additionalDocument.Eval("ram:AttachmentBinaryObject").String()
@@ -337,6 +346,7 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 	}
 
 	for paymentMeans := range applicableHeaderTradeSettlement.Each("ram:SpecifiedTradeSettlementPaymentMeans") {
+		inv.checkContext()
 		// BG-16
 		thisPaymentMeans := PaymentMeans{
 			TypeCode:                                             paymentMeans.Eval("ram:TypeCode").Int(),
@@ -360,6 +370,7 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 	}
 
 	for allowanceCharge := range applicableHeaderTradeSettlement.Each("ram:SpecifiedTradeAllowanceCharge") {
+		inv.checkContext()
 		basisAmount, err := getDecimal(allowanceCharge, "ram:BasisAmount")
 		if err != nil {
 			return err
@@ -394,6 +405,7 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 	// Parse SpecifiedLogisticsServiceCharge and convert to document-level charges
 	// Per EN 16931, logistics service charges are document-level charges (BT-99)
 	for logisticsCharge := range applicableHeaderTradeSettlement.Each("ram:SpecifiedLogisticsServiceCharge") {
+		inv.checkContext()
 		appliedAmount, err := getDecimal(logisticsCharge, "ram:AppliedAmount")
 		if err != nil {
 			return err
@@ -427,6 +439,7 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 
 	// ram:SpecifiedTradePaymentTerms
 	for paymentTerm := range applicableHeaderTradeSettlement.Each("ram:SpecifiedTradePaymentTerms") {
+		inv.checkContext()
 		spt := SpecifiedTradePaymentTerms{}
 		spt.Description = paymentTerm.Eval("ram:Description").String()
 		spt.DueDate, err = parseCIITime(paymentTerm, "ram:DueDateDateTime/udt:DateTimeString")
@@ -439,6 +452,7 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 	}
 
 	for att := range applicableHeaderTradeSettlement.Each("ram:ApplicableTradeTax") {
+		inv.checkContext()
 		tradeTax := TradeTax{}
 		tradeTax.CalculatedAmount, err = getDecimal(att, "ram:CalculatedAmount")
 		if err != nil {
@@ -488,6 +502,7 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 	// BT-110 and BT-111: Parse TaxTotalAmount by matching currencyID (not position)
 	// EN 16931 specifies which currency each total must be in, regardless of XML order
 	for taxTotal := range summation.Each("ram:TaxTotalAmount") {
+		inv.checkContext()
 		currency := taxTotal.Eval("@currencyID").String()
 		amount, err := getDecimal(taxTotal, ".")
 		if err != nil {
@@ -524,6 +539,7 @@ func parseCIIApplicableHeaderTradeSettlement(applicableHeaderTradeSettlement *cx
 
 	// BG-3
 	for refdoc := range applicableHeaderTradeSettlement.Each("ram:InvoiceReferencedDocument") {
+		inv.checkContext()
 		refDoc := ReferencedDocument{}
 
 		refDoc.Date, err = parseCIITime(refdoc, "ram:FormattedIssueDateTime/qdt:DateTimeString")

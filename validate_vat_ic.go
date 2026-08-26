@@ -26,6 +26,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	// Invoice with category K must have both seller and buyer VAT IDs
 	hasIntracommunitySupply := false
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "K" {
 			hasIntracommunitySupply = true
 			break
@@ -33,6 +34,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	}
 	if !hasIntracommunitySupply {
 		for i := range inv.SpecifiedTradeAllowanceCharge {
+			inv.checkContext()
 			if inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "K" {
 				hasIntracommunitySupply = true
 				break
@@ -60,6 +62,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	// BR-IC-2 Innergemeinschaftliche Lieferung
 	// Lines with category K require seller and buyer VAT IDs
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "K" {
 			hasSellerVATID := inv.Seller.VATaxRegistration != "" ||
 				inv.Seller.FCTaxRegistration != "" ||
@@ -79,6 +82,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	// BR-IC-3 Innergemeinschaftliche Lieferung
 	// VAT rate must be 0 for lines with category K
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "K" && !inv.InvoiceLines[i].TaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRIC3, "Intra-community supply VAT rate must be 0")
 		}
@@ -87,6 +91,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	// BR-IC-4 Innergemeinschaftliche Lieferung
 	// VAT rate must be 0 for allowances with category K
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if !inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "K" && !inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRIC4, "Intra-community supply allowance VAT rate must be 0")
 		}
@@ -95,6 +100,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	// BR-IC-5 Innergemeinschaftliche Lieferung
 	// VAT rate must be 0 for charges with category K
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "K" && !inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRIC5, "Intra-community supply charge VAT rate must be 0")
 		}
@@ -103,6 +109,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	// BR-IC-6 Innergemeinschaftliche Lieferung
 	// Verify taxable amount calculation for category K
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "K" {
 			// Detail lines only; aggregation lines (GROUP / INFORMATION) are
 			// excluded so they are not double counted (EXTENDED).
@@ -116,6 +123,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	// BR-IC-7 Innergemeinschaftliche Lieferung
 	// VAT amount must be 0 for category K
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "K" && !inv.TradeTaxes[i].CalculatedAmount.IsZero() {
 			inv.addViolation(rules.BRIC7, "Intra-community supply VAT amount must be 0")
 		}
@@ -127,6 +135,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	// BasicWL profile (level 2) provides BasisAmount directly without line items.
 	if inv.ProfileLevel() >= levelBasic || (inv.ProfileLevel() == 0 && len(inv.InvoiceLines) > 0) {
 		for i := range inv.TradeTaxes {
+			inv.checkContext()
 			if inv.TradeTaxes[i].CategoryCode == "K" {
 				// Detail lines only; aggregation lines (GROUP / INFORMATION) are
 				// excluded so they are not double counted (EXTENDED).
@@ -141,6 +150,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	// BR-IC-9 Innergemeinschaftliche Lieferung
 	// VAT amount must be 0 for category K (duplicate of BR-IC-7, but specified separately in spec)
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "K" && !inv.TradeTaxes[i].CalculatedAmount.IsZero() {
 			inv.addViolation(rules.BRIC9, "Intra-community supply VAT amount must be 0")
 		}
@@ -149,6 +159,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	// BR-IC-10 Innergemeinschaftliche Lieferung
 	// Intra-community supply breakdown must have exemption reason code or text
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "K" && inv.TradeTaxes[i].ExemptionReason == "" && inv.TradeTaxes[i].ExemptionReasonCode == "" {
 			inv.addViolation(rules.BRIC10, "Intra-community supply VAT breakdown must have exemption reason")
 		}
@@ -158,6 +169,7 @@ func (inv *Invoice) validateVATIntracommunity() {
 	// Must have actual delivery date or invoicing period
 	hasIntraCommunityInVATBreakdown := false
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "K" {
 			hasIntraCommunityInVATBreakdown = true
 			break

@@ -21,6 +21,7 @@ func (inv *Invoice) validateVATReverse() {
 	// If invoice has line/allowance/charge with "AE", must have at least one "AE" in VAT breakdown
 	hasReverseCharge := false
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "AE" {
 			hasReverseCharge = true
 			break
@@ -28,6 +29,7 @@ func (inv *Invoice) validateVATReverse() {
 	}
 	if !hasReverseCharge {
 		for i := range inv.SpecifiedTradeAllowanceCharge {
+			inv.checkContext()
 			if inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "AE" {
 				hasReverseCharge = true
 				break
@@ -37,6 +39,7 @@ func (inv *Invoice) validateVATReverse() {
 	if hasReverseCharge {
 		hasAEInBreakdown := false
 		for i := range inv.TradeTaxes {
+			inv.checkContext()
 			if inv.TradeTaxes[i].CategoryCode == "AE" {
 				hasAEInBreakdown = true
 				break
@@ -51,6 +54,7 @@ func (inv *Invoice) validateVATReverse() {
 	// If invoice line has "AE", must have seller VAT ID/tax reg/rep VAT ID AND buyer VAT ID
 	hasAELine := false
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "AE" {
 			hasAELine = true
 			break
@@ -70,6 +74,7 @@ func (inv *Invoice) validateVATReverse() {
 	// If document level allowance has "AE", must have seller and buyer tax IDs
 	hasAEAllowance := false
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if !inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "AE" {
 			hasAEAllowance = true
 			break
@@ -89,6 +94,7 @@ func (inv *Invoice) validateVATReverse() {
 	// If document level charge has "AE", must have seller and buyer tax IDs
 	hasAECharge := false
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "AE" {
 			hasAECharge = true
 			break
@@ -107,6 +113,7 @@ func (inv *Invoice) validateVATReverse() {
 	// BR-AE-5 Umkehrung der Steuerschuldnerschaft
 	// In invoice line with "AE", VAT rate must be 0
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "AE" && !inv.InvoiceLines[i].TaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRAE5, "Reverse charge invoice line must have VAT rate of 0")
 		}
@@ -115,6 +122,7 @@ func (inv *Invoice) validateVATReverse() {
 	// BR-AE-6 Umkehrung der Steuerschuldnerschaft
 	// In document level allowance with "AE", VAT rate must be 0
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if !inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "AE" && !inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRAE6, "Reverse charge allowance must have VAT rate of 0")
 		}
@@ -123,6 +131,7 @@ func (inv *Invoice) validateVATReverse() {
 	// BR-AE-7 Umkehrung der Steuerschuldnerschaft
 	// In document level charge with "AE", VAT rate must be 0
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator && inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "AE" && !inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxRateApplicablePercent.IsZero() {
 			inv.addViolation(rules.BRAE7, "Reverse charge charge must have VAT rate of 0")
 		}
@@ -134,6 +143,7 @@ func (inv *Invoice) validateVATReverse() {
 	// BasicWL profile (level 2) provides BasisAmount directly without line items.
 	if inv.ProfileLevel() >= levelBasic || (inv.ProfileLevel() == 0 && len(inv.InvoiceLines) > 0) {
 		for i := range inv.TradeTaxes {
+			inv.checkContext()
 			if inv.TradeTaxes[i].CategoryCode == "AE" {
 				// Sub invoice line aggregation lines (GROUP / INFORMATION) are
 				// excluded so they are not double counted (EXTENDED). In the
@@ -148,6 +158,7 @@ func (inv *Invoice) validateVATReverse() {
 	// BR-AE-9 Umkehrung der Steuerschuldnerschaft
 	// VAT amount must be 0 for Reverse charge
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "AE" && !inv.TradeTaxes[i].CalculatedAmount.IsZero() {
 			inv.addViolation(rules.BRAE9, "Reverse charge VAT amount must be 0")
 		}
@@ -156,6 +167,7 @@ func (inv *Invoice) validateVATReverse() {
 	// BR-AE-10 Umkehrung der Steuerschuldnerschaft
 	// Reverse charge breakdown must have exemption reason code or text
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if inv.TradeTaxes[i].CategoryCode == "AE" && inv.TradeTaxes[i].ExemptionReason == "" && inv.TradeTaxes[i].ExemptionReasonCode == "" {
 			inv.addViolation(rules.BRAE10, "Reverse charge VAT breakdown must have exemption reason")
 		}

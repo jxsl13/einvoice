@@ -45,8 +45,11 @@ func Validate(ctx context.Context, src io.Reader, options Options) (result Resul
 		return Result{}, failure(ErrorCanceled, "", contextErr)
 	}
 
-	invoice, parseErr := einvoice.ParseReader(bytes.NewReader(data))
+	invoice, parseErr := einvoice.ParseReaderContext(ctx, bytes.NewReader(data))
 	if parseErr != nil {
+		if contextErr := ctx.Err(); contextErr != nil {
+			return Result{}, failure(ErrorCanceled, "", contextErr)
+		}
 		return Result{}, failure(ErrorMalformedInput, "", nil)
 	}
 	if !syntaxMatches(result.Syntax, invoice.SchemaType) {
@@ -60,7 +63,10 @@ func Validate(ctx context.Context, src io.Reader, options Options) (result Resul
 		return Result{}, failure(ErrorCanceled, "", contextErr)
 	}
 
-	validationErr := invoice.Validate()
+	validationErr := invoice.ValidateContext(ctx)
+	if contextErr := ctx.Err(); contextErr != nil {
+		return Result{}, failure(ErrorCanceled, "", contextErr)
+	}
 	var semanticErr *einvoice.ValidationError
 	switch {
 	case validationErr == nil:

@@ -39,6 +39,7 @@ func (inv *Invoice) validateCalculations() {
 	// Umsatzsteuerdatum "Value added tax point date" (BT-7) und Code für das Umsatzsteuerdatum "Value added tax point date code" (BT-8)
 	// schließen sich gegenseitig aus.
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		if !inv.TradeTaxes[i].TaxPointDate.IsZero() && inv.TradeTaxes[i].DueDateTypeCode != "" {
 			inv.addViolation(rules.BRCO3, "TaxPointDate and DueDateTypeCode are mutually exclusive")
 			break
@@ -51,6 +52,7 @@ func (inv *Invoice) validateCalculations() {
 	// Sub invoice line aggregation lines (GROUP / INFORMATION) may omit the VAT
 	// category (BR-FXEXT) and must be excluded from document-level sums.
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if !inv.InvoiceLines[i].isDetailLine() {
 			continue
 		}
@@ -67,6 +69,7 @@ func (inv *Invoice) validateCalculations() {
 		sum = decimal.Zero
 		detailCount := 0
 		for i := range inv.InvoiceLines {
+			inv.checkContext()
 			if !inv.InvoiceLines[i].isDetailLine() {
 				continue
 			}
@@ -90,6 +93,7 @@ func (inv *Invoice) validateCalculations() {
 	// der Elemente "Document level allowance amount" (BT-92).
 	calculatedAllowanceTotal := decimal.Zero
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if !inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator {
 			calculatedAllowanceTotal = calculatedAllowanceTotal.Add(inv.SpecifiedTradeAllowanceCharge[i].ActualAmount)
 		}
@@ -103,6 +107,7 @@ func (inv *Invoice) validateCalculations() {
 	// der Elemente "Document level charge amount" (BT-99).
 	calculatedChargeTotal := decimal.Zero
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator {
 			calculatedChargeTotal = calculatedChargeTotal.Add(inv.SpecifiedTradeAllowanceCharge[i].ActualAmount)
 		}
@@ -129,6 +134,7 @@ func (inv *Invoice) validateCalculations() {
 	if len(inv.TradeTaxes) > 0 {
 		calculatedTaxTotal := decimal.Zero
 		for i := range inv.TradeTaxes {
+			inv.checkContext()
 			calculatedTaxTotal = calculatedTaxTotal.Add(inv.TradeTaxes[i].CalculatedAmount)
 		}
 		if !inv.TaxTotal.Equal(calculatedTaxTotal) {
@@ -186,6 +192,7 @@ func (inv *Invoice) validateCalculations() {
 	// Der Inhalt des Elementes "VAT category tax amount" (BT-117) entspricht dem Inhalt des Elementes "VAT category taxable amount" (BT-116),
 	// multipliziert mit dem Inhalt des Elementes "VAT category rate" (BT-119) geteilt durch 100, gerundet auf zwei Dezimalstellen.
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		expected := roundHalfUp(inv.TradeTaxes[i].BasisAmount.Mul(inv.TradeTaxes[i].Percent).Div(decimal100), 2)
 		if !inv.TradeTaxes[i].CalculatedAmount.Equal(expected) {
 			inv.addViolation(rules.BRCO17, fmt.Sprintf("VAT category tax amount %s does not match expected %s (basis %s × rate %s ÷ 100)", inv.TradeTaxes[i].CalculatedAmount.String(), expected.String(), inv.TradeTaxes[i].BasisAmount.String(), inv.TradeTaxes[i].Percent.String()))
@@ -214,6 +221,7 @@ func (inv *Invoice) validateCalculations() {
 	// das Element "Invoice line period end date" (BT-135) oder beide gefüllt sein.
 	// Note: Only validates parsed XML where BG-26 element was present (tracked via linePeriodPresent flag).
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].linePeriodPresent {
 			if inv.InvoiceLines[i].BillingSpecifiedPeriodStart.IsZero() && inv.InvoiceLines[i].BillingSpecifiedPeriodEnd.IsZero() {
 				inv.addViolation(rules.BRCO20, fmt.Sprintf("Invoice line %d: if line period (BG-26) is used, either start date (BT-134) or end date (BT-135) must be filled", i+1))
@@ -408,6 +416,7 @@ func (inv *Invoice) validateCore() {
 		br22, br23, br26 = rules.BRFXEXT22, rules.BRFXEXT23, rules.BRFXEXT26
 	}
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		// BT-X-8 (EXTENDED): the invoice line subtype, when present, must be a
 		// known value. isDetailLine treats any unknown value as an aggregation
 		// line, which would silently drop the line from the totals and the VAT
@@ -485,6 +494,7 @@ func (inv *Invoice) validateCore() {
 		}
 	}
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		// BR-30 Rechnungszeitraum auf Positionsebene
 		// Wenn Start- und Enddatum des Rechnungspositionenzeitraums gegeben sind, muss das Enddatum "Invoice line period end date" (BT-135) nach
 		// dem Startdatum "Invoice line period start date" (BT-134) liegen oder mit diesem identisch sein.
@@ -500,6 +510,7 @@ func (inv *Invoice) validateCore() {
 	// Use composite key of CategoryCode + Percent to properly group by tax category
 	applicableTradeTaxes := make(map[string]decimal.Decimal, len(inv.TradeTaxes))
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if !inv.InvoiceLines[i].isDetailLine() {
 			continue
 		}
@@ -508,6 +519,7 @@ func (inv *Invoice) validateCore() {
 	}
 
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		// BR-66 Specified Trade Allowance Charge
 		// Each Specified Trade Allowance Charge shall contain a Charge Indicator.
 		// Note: In Go, the boolean ChargeIndicator field always has a value (true or false),
@@ -589,10 +601,12 @@ func (inv *Invoice) validateCore() {
 	}
 
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		// BR-41 Abschläge auf Ebene der Rechnungsposition
 		// Jeder Nachlass auf der Ebene der Rechnungsposition "INVOICE LINE ALLOWANCES" (BG-27) muss einen Betrag "Invoice line allowance amount"
 		// (BT-136) aufweisen.
 		for j := range inv.InvoiceLines[i].InvoiceLineAllowances {
+			inv.checkContext()
 			if inv.InvoiceLines[i].InvoiceLineAllowances[j].ActualAmount.IsZero() {
 				inv.addViolation(rules.BR41, "Line allowance amount zero")
 			}
@@ -604,6 +618,7 @@ func (inv *Invoice) validateCore() {
 			}
 		}
 		for j := range inv.InvoiceLines[i].InvoiceLineCharges {
+			inv.checkContext()
 			// BR-43 Charge ou frais sur ligne de facture
 			// Jede Abgabe auf der Ebene der Rechnungsposition "INVOICE LINE CHARGES" (BG-28) muss einen Betrag "Invoice line charge amount" (BT-141)
 			// aufweisen.
@@ -620,6 +635,7 @@ func (inv *Invoice) validateCore() {
 	}
 
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		// BR-46 Umsatzsteueraufschlüsselung
 		// Jede Umsatzsteueraufschlüsselung "VAT BREAKDOWN" (BG-23) muss den für
 		// die betreffende Umsatzsteuerkategorie zu entrichtenden Gesamtbetrag
@@ -658,6 +674,7 @@ func (inv *Invoice) validateCore() {
 		}
 	}
 	for i := range inv.PaymentMeans {
+		inv.checkContext()
 		// BR-49 Zahlungsanweisungen
 		// Die Zahlungsinstruktionen "PAYMENT INSTRUCTIONS" (BG-16) müssen den Zahlungsart-Code "Payment means type code" (BT-81) enthalten.
 		if inv.PaymentMeans[i].TypeCode == 0 {
@@ -680,6 +697,7 @@ func (inv *Invoice) validateCore() {
 	// Jede rechnungsbegründende Unterlage muss einen Dokumentenbezeichner
 	// "Supporting document reference" (BT-122) haben.
 	for i := range inv.AdditionalReferencedDocument {
+		inv.checkContext()
 		if inv.AdditionalReferencedDocument[i].IssuerAssignedID == "" {
 			inv.addViolation(rules.BR52, "Supporting document must have a reference")
 		}
@@ -696,6 +714,7 @@ func (inv *Invoice) validateCore() {
 	// Validate TaxTotalAmount currency consistency
 	// EN 16931 specifies only BT-110 (invoice currency) and BT-111 (accounting currency) are allowed
 	for _, unexpectedCurrency := range inv.unexpectedTaxCurrencies {
+		inv.checkContext()
 		expectedCurrencies := inv.InvoiceCurrencyCode
 		if inv.TaxCurrencyCode != "" {
 			expectedCurrencies += " or " + inv.TaxCurrencyCode
@@ -709,7 +728,9 @@ func (inv *Invoice) validateCore() {
 	// (BG-32) muss eine Bezeichnung "Item attribute name" (BT-160) und einen
 	// Wert "Item attribute value" (BT-161) haben.
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		for j := range inv.InvoiceLines[i].Characteristics {
+			inv.checkContext()
 			if inv.InvoiceLines[i].Characteristics[j].Description == "" || inv.InvoiceLines[i].Characteristics[j].Value == "" {
 				inv.addViolation(rules.BR54, "Item attribute must have both name and value")
 			}
@@ -721,6 +742,7 @@ func (inv *Invoice) validateCore() {
 	// reference" (BT-25) muss die Nummer der vorausgegangenen Rechnung
 	// enthalten.
 	for _, ref := range inv.InvoiceReferencedDocument {
+		inv.checkContext()
 		if ref.ID == "" {
 			inv.addViolation(rules.BR55, "Preceding invoice reference must contain invoice number")
 		}
@@ -747,6 +769,7 @@ func (inv *Invoice) validateCore() {
 	// exists but neither IBANID nor ProprietaryID elements are present.
 	if inv.isParsed {
 		for i := range inv.PaymentMeans {
+			inv.checkContext()
 			if (inv.PaymentMeans[i].TypeCode == 30 || inv.PaymentMeans[i].TypeCode == 58) && inv.PaymentMeans[i].hasPayeeAccountInXML {
 				if !inv.PaymentMeans[i].hasPayeeIBANInXML && !inv.PaymentMeans[i].hasPayeeProprietaryIDInXML {
 					inv.addViolation(rules.BR61, "Payment account identifier required for credit transfer payment types")
@@ -773,6 +796,7 @@ func (inv *Invoice) validateCore() {
 	// Im Element "Item standard identifier" (BT-157) muss die Komponente
 	// "Scheme Identifier" vorhanden sein.
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].GlobalID != "" && inv.InvoiceLines[i].GlobalIDType == "" {
 			inv.addViolation(rules.BR64, "Item standard identifier must have scheme identifier")
 		}
@@ -782,7 +806,9 @@ func (inv *Invoice) validateCore() {
 	// Im Element "Item classification identifier" (BT-158) muss die Komponente
 	// "Scheme Identifier" vorhanden sein.
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		for j := range inv.InvoiceLines[i].ProductClassification {
+			inv.checkContext()
 			if inv.InvoiceLines[i].ProductClassification[j].ClassCode != "" && inv.InvoiceLines[i].ProductClassification[j].ListID == "" {
 				inv.addViolation(rules.BR65, "Item classification identifier must have scheme identifier")
 			}
@@ -794,6 +820,7 @@ func (inv *Invoice) validateCore() {
 	// This means both seller and buyer must be located in Italy (IT).
 	hasSplitPayment := false
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "B" {
 			hasSplitPayment = true
 			break
@@ -801,6 +828,7 @@ func (inv *Invoice) validateCore() {
 	}
 	if !hasSplitPayment {
 		for i := range inv.SpecifiedTradeAllowanceCharge {
+			inv.checkContext()
 			if inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "B" {
 				hasSplitPayment = true
 				break
@@ -828,6 +856,7 @@ func (inv *Invoice) validateCore() {
 	// An Invoice with Split payment (B) shall not contain Standard rated (S) VAT category.
 	hasStandardRated := false
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		if inv.InvoiceLines[i].TaxCategoryCode == "S" {
 			hasStandardRated = true
 			break
@@ -835,6 +864,7 @@ func (inv *Invoice) validateCore() {
 	}
 	if !hasStandardRated {
 		for i := range inv.SpecifiedTradeAllowanceCharge {
+			inv.checkContext()
 			if inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode == "S" {
 				hasStandardRated = true
 				break
@@ -877,6 +907,7 @@ func (inv *Invoice) validateDecimals() {
 	// BR-DEC-05: Document level charge amount (BT-99)
 	// BR-DEC-06: Document level charge base amount (BT-100)
 	for i := range inv.SpecifiedTradeAllowanceCharge {
+		inv.checkContext()
 		if !inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator {
 			// Allowance
 			checkDecimalPrecision(inv.SpecifiedTradeAllowanceCharge[i].ActualAmount, "Document level allowance amount", "BT-92", rules.BRDEC1)
@@ -921,6 +952,7 @@ func (inv *Invoice) validateDecimals() {
 	// BR-DEC-19: VAT category taxable amount (BT-116)
 	// BR-DEC-20: VAT category tax amount (BT-117)
 	for i := range inv.TradeTaxes {
+		inv.checkContext()
 		checkDecimalPrecision(inv.TradeTaxes[i].BasisAmount, "VAT category taxable amount", "BT-116", rules.BRDEC19)
 		checkDecimalPrecision(inv.TradeTaxes[i].CalculatedAmount, "VAT category tax amount", "BT-117", rules.BRDEC20)
 	}
@@ -931,15 +963,18 @@ func (inv *Invoice) validateDecimals() {
 	// BR-DEC-27: Invoice line charge amount (BT-141)
 	// BR-DEC-28: Invoice line charge base amount (BT-142)
 	for i := range inv.InvoiceLines {
+		inv.checkContext()
 		linePrefix := fmt.Sprintf("Line %d: ", i+1)
 		checkDecimalPrecision(inv.InvoiceLines[i].Total, linePrefix+"Invoice line net amount", "BT-131", rules.BRDEC23)
 
 		for j := range inv.InvoiceLines[i].InvoiceLineAllowances {
+			inv.checkContext()
 			checkDecimalPrecision(inv.InvoiceLines[i].InvoiceLineAllowances[j].ActualAmount, linePrefix+"Invoice line allowance amount", "BT-136", rules.BRDEC24)
 			checkDecimalPrecision(inv.InvoiceLines[i].InvoiceLineAllowances[j].BasisAmount, linePrefix+"Invoice line allowance base amount", "BT-137", rules.BRDEC25)
 		}
 
 		for j := range inv.InvoiceLines[i].InvoiceLineCharges {
+			inv.checkContext()
 			checkDecimalPrecision(inv.InvoiceLines[i].InvoiceLineCharges[j].ActualAmount, linePrefix+"Invoice line charge amount", "BT-141", rules.BRDEC27)
 			checkDecimalPrecision(inv.InvoiceLines[i].InvoiceLineCharges[j].BasisAmount, linePrefix+"Invoice line charge base amount", "BT-142", rules.BRDEC28)
 		}
