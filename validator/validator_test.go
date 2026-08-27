@@ -69,6 +69,33 @@ func TestValidateSupportedFixturesDeterministically(t *testing.T) {
 	}
 }
 
+func TestBaseEN16931AllowsEmptyOptionalElement(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../testdata/ubl/invoice/ubl-tc434-example1.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := bytes.Index(data, []byte("<cbc:Note>"))
+	end := bytes.Index(data, []byte("</cbc:Note>"))
+	if start < 0 || end < start {
+		t.Fatal("fixture has no note to make empty")
+	}
+	end += len("</cbc:Note>")
+	data = append(append(append([]byte(nil), data[:start]...), []byte("<cbc:Note/>")...), data[end:]...)
+
+	result, err := Validate(context.Background(), bytes.NewReader(data), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Profile != ProfileEN16931 {
+		t.Fatalf("profile = %q, want %q", result.Profile, ProfileEN16931)
+	}
+	if hasRule(result.Findings, "PEPPOL-EN16931-R008") {
+		t.Fatalf("base EN 16931 received inapplicable PEPPOL empty-element finding: %#v", result.Findings)
+	}
+}
+
 func TestValidateRejectsUnsupportedProfilesBeforeRuleWeakening(t *testing.T) {
 	t.Parallel()
 	result, err := Validate(context.Background(), strings.NewReader(ubl("urn:example:unsupported", "")), Options{})

@@ -95,15 +95,17 @@ func Validate(ctx context.Context, src io.Reader, options Options) (result Resul
 	default:
 		return Result{}, failure(ErrorInternal, "rule_validation", nil)
 	}
-	if empty, emptyErr := hasForbiddenEmptyElement(ctx, data, result.Syntax); emptyErr != nil {
-		return Result{}, failure(ErrorInternal, "empty_element_scan", nil)
-	} else if empty && !hasRule(result.Findings, "PEPPOL-EN16931-R008") {
-		result.Findings = append(result.Findings, Finding{
-			RuleID:      "PEPPOL-EN16931-R008",
-			Severity:    SeverityError,
-			MessageCode: "rule.peppol_en16931_r008",
-		})
-		result.Accepted = false
+	if result.Profile == ProfileXRechnung30 {
+		if empty, emptyErr := hasForbiddenEmptyElement(ctx, data, result.Syntax); emptyErr != nil {
+			return Result{}, failure(ErrorInternal, "empty_element_scan", nil)
+		} else if empty && !hasRule(result.Findings, "PEPPOL-EN16931-R008") {
+			result.Findings = append(result.Findings, Finding{
+				RuleID:      "PEPPOL-EN16931-R008",
+				Severity:    SeverityError,
+				MessageCode: "rule.peppol_en16931_r008",
+			})
+			result.Accepted = false
+		}
 	}
 	if contextErr := ctx.Err(); contextErr != nil {
 		return Result{}, failure(ErrorCanceled, "", contextErr)

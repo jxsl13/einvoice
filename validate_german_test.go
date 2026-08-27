@@ -943,6 +943,23 @@ func TestGermanValidation_BRDE23AB_PaymentMeansMutualExclusivity(t *testing.T) {
 	}
 }
 
+func TestGermanValidation_BRDE23AInstitutionIsNotCreditorAccount(t *testing.T) {
+	t.Parallel()
+
+	inv := createGermanTestInvoice()
+	inv.SchemaType = CII
+	inv.PaymentMeans = []PaymentMeans{{
+		TypeCode: 58,
+		PayeeSpecifiedCreditorFinancialInstitutionBIC: "GENODEF1S01",
+		hasPayeeInstitutionInXML:                      true,
+	}}
+
+	err := inv.Validate()
+	if !hasRuleViolation(err, rules.BRDE23A) {
+		t.Fatalf("financial institution without creditor account did not violate BR-DE-23-a: %v", err)
+	}
+}
+
 // TestGermanValidation_BRDE24AB_PaymentCardMutualExclusivity tests BR-DE-24-a and BR-DE-24-b:
 // Payment card means must have BG-18 and must NOT have BG-17 or BG-19.
 func TestGermanValidation_BRDE24AB_PaymentCardMutualExclusivity(t *testing.T) {

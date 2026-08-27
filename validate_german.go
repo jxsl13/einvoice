@@ -244,12 +244,16 @@ func (inv *Invoice) validateGerman() {
 		inv.checkContext()
 		// Determine which payment information groups are present
 		hasBG17CreditTransfer := inv.PaymentMeans[i].hasPayeeAccountInXML || inv.PaymentMeans[i].PayeePartyCreditorFinancialAccountIBAN != "" ||
-			inv.PaymentMeans[i].PayeePartyCreditorFinancialAccountProprietaryID != "" ||
-			inv.PaymentMeans[i].hasPayeeInstitutionInXML || inv.PaymentMeans[i].hasPayerInstitutionInXML
+			inv.PaymentMeans[i].PayeePartyCreditorFinancialAccountProprietaryID != ""
 		hasBG18PaymentCard := inv.PaymentMeans[i].hasPaymentCardInXML || inv.PaymentMeans[i].ApplicableTradeSettlementFinancialCardID != ""
 		hasBG19DirectDebit := inv.PaymentMeans[i].hasPaymentMandateInXML || inv.PaymentMeans[i].hasPayerAccountIDInXML || inv.PaymentMeans[i].PayerPartyDebtorFinancialAccountIBAN != ""
+		hasForbiddenBRDE25BG17 := hasBG17CreditTransfer
 		if inv.SchemaType == CII {
 			hasBG19DirectDebit = hasBG19DirectDebit || inv.CreditorReferenceID != "" || hasDirectDebitMandate(inv.SpecifiedTradePaymentTerms)
+			// The pinned CII mapping for BR-DE-25-b explicitly treats both
+			// financial-institution elements as forbidden BG-17 content.
+			hasForbiddenBRDE25BG17 = hasForbiddenBRDE25BG17 ||
+				inv.PaymentMeans[i].hasPayeeInstitutionInXML || inv.PaymentMeans[i].hasPayerInstitutionInXML
 		}
 
 		// BR-DE-23: Credit transfer (codes 30, 58)
@@ -292,7 +296,7 @@ func (inv *Invoice) validateGerman() {
 			}
 
 			// BR-DE-25-b: Must NOT have BG-17 (credit transfer) or BG-18 (payment card)
-			if hasBG17CreditTransfer {
+			if hasForbiddenBRDE25BG17 {
 				inv.addViolation(rules.BRDE25B, "Payment means code 59 (direct debit) must not contain BG-17 CREDIT TRANSFER")
 			}
 			if hasBG18PaymentCard {

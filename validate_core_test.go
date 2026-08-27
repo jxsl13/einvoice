@@ -1,10 +1,12 @@
 package einvoice
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/jxsl13/einvoice/rules"
 	"github.com/shopspring/decimal"
 )
 
@@ -816,6 +818,55 @@ func TestCheckBRO_BR_CO_15_Invalid(t *testing.T) {
 	}
 	if !found {
 		t.Error("Expected BR-CO-15 violation, but none was found")
+	}
+}
+
+func TestBRCO15ParsedCIIMatchesPinnedSchematronAlternatives(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		taxTotals     []taxTotalXML
+		grandTotal    decimal.Decimal
+		wantViolation bool
+	}{
+		{
+			name:       "tax inclusive total may equal tax basis total",
+			taxTotals:  []taxTotalXML{{currency: "EUR", amount: decimal.NewFromInt(19)}},
+			grandTotal: decimal.NewFromInt(100),
+		},
+		{
+			name:       "tax inclusive total may include invoice currency tax",
+			taxTotals:  []taxTotalXML{{currency: "EUR", amount: decimal.NewFromInt(19)}},
+			grandTotal: decimal.NewFromInt(119),
+		},
+		{
+			name:          "tax inclusive total matching neither alternative fails",
+			taxTotals:     []taxTotalXML{{currency: "EUR", amount: decimal.NewFromInt(19)}},
+			grandTotal:    decimal.NewFromInt(110),
+			wantViolation: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			inv := &Invoice{
+				SchemaType:          CII,
+				InvoiceCurrencyCode: "EUR",
+				TaxBasisTotal:       decimal.NewFromInt(100),
+				TaxTotal:            decimal.NewFromInt(19),
+				GrandTotal:          test.grandTotal,
+				DuePayableAmount:    test.grandTotal,
+				isParsed:            true,
+				taxTotalsXML:        test.taxTotals,
+			}
+			inv.validateCalculations()
+			if got := slices.ContainsFunc(inv.violations, func(v SemanticError) bool {
+				return v.Rule.Code == rules.BRCO15.Code
+			}); got != test.wantViolation {
+				t.Fatalf("BR-CO-15 violation = %v, want %v; violations=%#v", got, test.wantViolation, inv.violations)
+			}
+		})
 	}
 }
 
