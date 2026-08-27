@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/speedata/cxpath"
 )
 
@@ -17,19 +18,21 @@ const (
 	nsUBLCBC        = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
 )
 
-// parseTimeUBL parses ISO 8601 date format (YYYY-MM-DD) used in UBL documents.
+// parseTimeUBL parses the XML Schema date lexical forms used in UBL. An
+// xs:date may include Z or a numeric timezone even though it has no time part.
 func parseTimeUBL(ctx *cxpath.Context, path string) (time.Time, error) {
 	timestring := ctx.Eval(path).String()
 	if timestring == "" {
 		return time.Time{}, nil
 	}
 
-	parsedDate, err := time.Parse("2006-01-02", timestring)
-	if err != nil {
-		return parsedDate, fmt.Errorf("invalid date %q at %s: %w", timestring, path, err)
+	for _, layout := range []string{"2006-01-02", "2006-01-02Z07:00"} {
+		parsedDate, err := time.Parse(layout, timestring)
+		if err == nil {
+			return parsedDate, nil
+		}
 	}
-
-	return parsedDate, nil
+	return time.Time{}, fmt.Errorf("invalid date %q at %s", timestring, path)
 }
 
 // parseUBL parses a UBL 2.1 Invoice or CreditNote document into an Invoice struct.
@@ -46,6 +49,7 @@ func parseUBL(operationCtx context.Context, ctx *cxpath.Context) (*Invoice, erro
 
 	// Get root element after namespace setup
 	root := ctx.Root()
+	inv.peppolEmptyElementCount = root.Eval("count(//*[not(*) and not(normalize-space())])").Int()
 
 	// Determine document type (Invoice vs CreditNote)
 	localName := root.Eval("local-name()").String()
@@ -54,6 +58,7 @@ func parseUBL(operationCtx context.Context, ctx *cxpath.Context) (*Invoice, erro
 	prefix := "inv:"
 	if localName == "CreditNote" {
 		prefix = "cn:"
+		inv.isUBLCreditNoteXML = true
 	}
 
 	// Parse all components
@@ -357,6 +362,9 @@ func parseUBLParty(partyCtx *cxpath.Context) Party {
 	for taxScheme := range partyCtx.Each("cac:PartyTaxScheme") {
 		taxID := taxScheme.Eval("cbc:CompanyID").String()
 		scheme := taxScheme.Eval("cac:TaxScheme/cbc:ID").String()
+		if scheme != "" && taxScheme.Eval("count(cbc:CompanyID)").Int() == 0 {
+			party.ublTaxSchemeMissingCompanyID = true
+		}
 
 		switch scheme {
 		case "VAT":
@@ -423,6 +431,11 @@ func parseUBLAllowanceCharge(root *cxpath.Context, inv *Invoice, prefix string) 
 				CategoryTradeTaxType:                  ac.Eval("cac:TaxCategory/cac:TaxScheme/cbc:ID").String(),
 				CategoryTradeTaxCategoryCode:          ac.Eval("cac:TaxCategory/cbc:ID").String(),
 				CategoryTradeTaxRateApplicablePercent: categoryTaxRate,
+				hasActualAmountInXML:                  ac.Eval("count(cbc:Amount)").Int() > 0,
+				hasBasisAmountInXML:                   ac.Eval("count(cbc:BaseAmount)").Int() > 0,
+				hasPercentInXML:                       ac.Eval("count(cbc:MultiplierFactorNumeric)").Int() > 0,
+				hasIndicatorInXML:                     ac.Eval("count(cbc:ChargeIndicator)").Int() > 0,
+				indicatorValidXML:                     isXMLBoolean(ac.Eval("cbc:ChargeIndicator").String()),
 			}
 
 			inv.SpecifiedTradeAllowanceCharge = append(inv.SpecifiedTradeAllowanceCharge, allowanceCharge)
@@ -435,6 +448,7 @@ func parseUBLAllowanceCharge(root *cxpath.Context, inv *Invoice, prefix string) 
 // parseUBLTaxTotal parses the tax breakdown (BG-23).
 func parseUBLTaxTotal(root *cxpath.Context, inv *Invoice, prefix string) error {
 	var err error
+	invoiceTaxTotalSet := false
 
 	// BT-110 and BT-111: Parse TaxTotal by matching currencyID (not position)
 	// EN 16931 specifies which currency each total must be in, regardless of XML order
@@ -449,16 +463,35 @@ func parseUBLTaxTotal(root *cxpath.Context, inv *Invoice, prefix string) error {
 		if err != nil {
 			return fmt.Errorf("invalid TaxAmount with currency %s: %w", currency, err)
 		}
+		subtotalSum := decimal.Zero
+		for subtotal := range taxTotal.Each("cac:TaxSubtotal") {
+			subtotalAmount, subtotalErr := getDecimal(subtotal, "cbc:TaxAmount")
+			if subtotalErr != nil {
+				return subtotalErr
+			}
+			subtotalSum = subtotalSum.Add(subtotalAmount)
+		}
+		hasTaxSubtotal := taxTotal.Eval("count(cac:TaxSubtotal)").Int() > 0
+		inv.taxTotalsXML = append(inv.taxTotalsXML, taxTotalXML{
+			currency:       currency,
+			amount:         amount,
+			hasTaxSubtotal: hasTaxSubtotal,
+			subtotalSum:    subtotalSum,
+		})
 
-		// BT-110: Tax total in invoice currency (must match BT-5)
+		// BT-110 is the tax total that owns the VAT breakdown. Selecting by
+		// structure mirrors the EN 16931 UBL binding and avoids treating an
+		// accounting-only TaxTotal as the invoice-currency total.
 		switch {
-		case currency == inv.InvoiceCurrencyCode:
+		case hasTaxSubtotal && !invoiceTaxTotalSet:
 			inv.TaxTotalCurrency = currency
 			inv.TaxTotal = amount
+			invoiceTaxTotalSet = true
 		case inv.TaxCurrencyCode != "" && currency == inv.TaxCurrencyCode:
 			// BT-111: Tax total in accounting currency (must match BT-6)
 			inv.TaxTotalAccountingCurrency = currency
 			inv.TaxTotalAccounting = amount
+			inv.hasTaxTotalAccountingXML = true
 		default:
 			// Track unexpected TaxTotal currencies for validation
 			inv.unexpectedTaxCurrencies = append(inv.unexpectedTaxCurrencies, currency)
@@ -477,6 +510,8 @@ func parseUBLTaxTotal(root *cxpath.Context, inv *Invoice, prefix string) error {
 			if err != nil {
 				return err
 			}
+			tradeTax.hasBasisAmountInXML = subtotal.Eval("count(cbc:TaxableAmount)").Int() > 0
+			tradeTax.hasPercentInXML = subtotal.Eval("count(cac:TaxCategory/cbc:Percent)").Int() > 0
 
 			tradeTax.CalculatedAmount, err = getDecimal(subtotal, "cbc:TaxAmount")
 			if err != nil {
@@ -600,12 +635,16 @@ func parseUBLPaymentMeans(root *cxpath.Context, inv *Invoice, prefix string) err
 
 			// BG-18: Payment card information
 			if pm.Eval("count(cac:CardAccount)").Int() > 0 {
+				paymentMeans.hasPaymentCardInXML = true
 				paymentMeans.ApplicableTradeSettlementFinancialCardID = pm.Eval("cac:CardAccount/cbc:PrimaryAccountNumberID").String()
 				paymentMeans.ApplicableTradeSettlementFinancialCardCardholderName = pm.Eval("cac:CardAccount/cbc:HolderName").String()
 			}
 
 			// BG-19: Direct debit
 			if pm.Eval("count(cac:PaymentMandate)").Int() > 0 {
+				paymentMeans.hasPaymentMandateInXML = true
+				paymentMeans.mandateIDXML = pm.Eval("cac:PaymentMandate/cbc:ID").String()
+				paymentMeans.hasPayerAccountIDInXML = pm.Eval("count(cac:PaymentMandate/cac:PayerFinancialAccount/cbc:ID)").Int() > 0
 				paymentMeans.PayerPartyDebtorFinancialAccountIBAN = pm.Eval("cac:PaymentMandate/cac:PayerFinancialAccount/cbc:ID").String()
 			}
 
@@ -701,6 +740,7 @@ func parseUBLLines(root *cxpath.Context, inv *Invoice, prefix string) error {
 		}
 
 		// BT-128: Invoice line object identifier
+		invoiceLine.lineDocumentReferenceCount = lineItem.Eval("count(cac:DocumentReference)").Int()
 		invoiceLine.AdditionalReferencedDocumentID = lineItem.Eval("cac:DocumentReference/cbc:ID").String()
 		invoiceLine.AdditionalReferencedDocumentTypeCode = lineItem.Eval("cac:DocumentReference/cbc:DocumentTypeCode").String()
 
@@ -764,12 +804,17 @@ func parseUBLLines(root *cxpath.Context, inv *Invoice, prefix string) error {
 				}
 
 				alc := AllowanceCharge{
-					ChargeIndicator:    chargeIndicator,
-					BasisAmount:        basisAmount,
-					ActualAmount:       actualAmount,
-					CalculationPercent: calculationPercent,
-					ReasonCode:         ac.Eval("cbc:AllowanceChargeReasonCode").String(),
-					Reason:             ac.Eval("cbc:AllowanceChargeReason").String(),
+					ChargeIndicator:      chargeIndicator,
+					BasisAmount:          basisAmount,
+					ActualAmount:         actualAmount,
+					CalculationPercent:   calculationPercent,
+					ReasonCode:           ac.Eval("cbc:AllowanceChargeReasonCode").String(),
+					Reason:               ac.Eval("cbc:AllowanceChargeReason").String(),
+					hasActualAmountInXML: ac.Eval("count(cbc:Amount)").Int() > 0,
+					hasBasisAmountInXML:  ac.Eval("count(cbc:BaseAmount)").Int() > 0,
+					hasPercentInXML:      ac.Eval("count(cbc:MultiplierFactorNumeric)").Int() > 0,
+					hasIndicatorInXML:    ac.Eval("count(cbc:ChargeIndicator)").Int() > 0,
+					indicatorValidXML:    isXMLBoolean(ac.Eval("cbc:ChargeIndicator").String()),
 				}
 
 				if chargeIndicator {
@@ -825,9 +870,10 @@ func parseUBLLineItem(lineItem *cxpath.Context, invoiceLine *InvoiceLine) error 
 		invoiceLine.ProductClassification = make([]Classification, 0, classCount)
 		for class := range item.Each("cac:CommodityClassification") {
 			classification := Classification{
-				ClassCode:     class.Eval("cbc:ItemClassificationCode").String(),
-				ListID:        class.Eval("cbc:ItemClassificationCode/@listID").String(),
-				ListVersionID: class.Eval("cbc:ItemClassificationCode/@listVersionID").String(),
+				ClassCode:      class.Eval("cbc:ItemClassificationCode").String(),
+				ListID:         class.Eval("cbc:ItemClassificationCode/@listID").String(),
+				ListVersionID:  class.Eval("cbc:ItemClassificationCode/@listVersionID").String(),
+				hasListIDInXML: class.Eval("count(cbc:ItemClassificationCode/@listID)").Int() > 0,
 			}
 			invoiceLine.ProductClassification = append(invoiceLine.ProductClassification, classification)
 		}
@@ -872,6 +918,7 @@ func parseUBLLinePrice(lineItem *cxpath.Context, invoiceLine *InvoiceLine) error
 		return err
 	}
 	invoiceLine.BasisQuantityUnit = price.Eval("cbc:BaseQuantity/@unitCode").String()
+	invoiceLine.hasNetBasisQuantityInXML = price.Eval("count(cbc:BaseQuantity)").Int() > 0
 
 	// BT-148: Item gross price (price before allowances)
 	// UBL doesn't have a direct gross price field, but may have allowances on price
@@ -898,12 +945,17 @@ func parseUBLLinePrice(lineItem *cxpath.Context, invoiceLine *InvoiceLine) error
 			}
 
 			allowanceCharge := AllowanceCharge{
-				ChargeIndicator:    chargeIndicator,
-				BasisAmount:        basisAmount,
-				ActualAmount:       actualAmount,
-				CalculationPercent: calculationPercent,
-				ReasonCode:         ac.Eval("cbc:AllowanceChargeReasonCode").String(),
-				Reason:             ac.Eval("cbc:AllowanceChargeReason").String(),
+				ChargeIndicator:      chargeIndicator,
+				BasisAmount:          basisAmount,
+				ActualAmount:         actualAmount,
+				CalculationPercent:   calculationPercent,
+				ReasonCode:           ac.Eval("cbc:AllowanceChargeReasonCode").String(),
+				Reason:               ac.Eval("cbc:AllowanceChargeReason").String(),
+				hasActualAmountInXML: ac.Eval("count(cbc:Amount)").Int() > 0,
+				hasBasisAmountInXML:  ac.Eval("count(cbc:BaseAmount)").Int() > 0,
+				hasPercentInXML:      ac.Eval("count(cbc:MultiplierFactorNumeric)").Int() > 0,
+				hasIndicatorInXML:    ac.Eval("count(cbc:ChargeIndicator)").Int() > 0,
+				indicatorValidXML:    isXMLBoolean(ac.Eval("cbc:ChargeIndicator").String()),
 			}
 
 			invoiceLine.AppliedTradeAllowanceCharge = append(invoiceLine.AppliedTradeAllowanceCharge, allowanceCharge)

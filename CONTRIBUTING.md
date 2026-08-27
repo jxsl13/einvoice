@@ -4,7 +4,7 @@ Thank you for your interest in contributing to this EN 16931 electronic invoice 
 
 ## Prerequisites
 
-- **Go 1.24 or later**
+- **Go 1.26.6 or later**
 - **golangci-lint** (optional but recommended)
   ```bash
   go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
@@ -127,7 +127,7 @@ Create a pull request with:
 ### 5. CI Requirements
 
 All PRs must pass:
-- Tests on Go 1.24 and 1.25 (Linux, macOS, Windows)
+- Tests on Go 1.26.6 and the latest stable Go release (Linux, macOS, Windows)
 - golangci-lint checks
 - Fuzz tests (30s each)
 - Benchmark tests

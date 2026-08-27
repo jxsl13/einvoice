@@ -143,6 +143,11 @@ func TestWrite_RoundTrip(t *testing.T) {
 			},
 			VATaxRegistration: "FR987654321",
 		},
+		AdditionalReferencedDocument: []Document{{
+			IssuerAssignedID: "ATTACHMENT-1",
+			URIID:            "https://example.test/invoice.pdf",
+			TypeCode:         "916",
+		}},
 		LineTotal:        decimal.NewFromInt(200),
 		TaxBasisTotal:    decimal.NewFromInt(200),
 		TaxTotal:         decimal.NewFromInt(38),
@@ -181,6 +186,17 @@ func TestWrite_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to write invoice: %v", err)
 	}
+	additionalStart := strings.Index(buf.String(), "<ram:AdditionalReferencedDocument>")
+	additionalEnd := strings.Index(buf.String(), "</ram:AdditionalReferencedDocument>")
+	if additionalStart < 0 || additionalEnd <= additionalStart {
+		t.Fatal("written invoice has no additional referenced document")
+	}
+	additionalXML := buf.String()[additionalStart:additionalEnd]
+	uriPosition := strings.Index(additionalXML, "<ram:URIID>")
+	typePosition := strings.Index(additionalXML, "<ram:TypeCode>")
+	if uriPosition < 0 || typePosition < 0 || uriPosition > typePosition {
+		t.Fatalf("CII reference child order is invalid: %s", additionalXML)
+	}
 
 	// Parse back
 	parsed, err := ParseReader(&buf)
@@ -211,6 +227,10 @@ func TestWrite_RoundTrip(t *testing.T) {
 
 	if len(parsed.InvoiceLines) != len(original.InvoiceLines) {
 		t.Errorf("InvoiceLines count mismatch: got %d, want %d", len(parsed.InvoiceLines), len(original.InvoiceLines))
+	}
+	if len(parsed.AdditionalReferencedDocument) != 1 ||
+		parsed.AdditionalReferencedDocument[0].URIID != original.AdditionalReferencedDocument[0].URIID {
+		t.Fatalf("additional referenced document did not round-trip: %#v", parsed.AdditionalReferencedDocument)
 	}
 
 	if len(parsed.InvoiceLines) > 0 {

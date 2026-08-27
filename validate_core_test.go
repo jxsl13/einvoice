@@ -1,10 +1,12 @@
 package einvoice
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/jxsl13/einvoice/rules"
 	"github.com/shopspring/decimal"
 )
 
@@ -323,6 +325,30 @@ func TestBRCO17_VATCalculation(t *testing.T) {
 
 	if !brco17Found {
 		t.Error("Expected BR-CO-17 violation when VAT calculation is incorrect")
+	}
+}
+
+func TestVATAmountWithinOfficialTolerance(t *testing.T) {
+	t.Parallel()
+
+	expected := decimal.NewFromInt(19)
+	for _, test := range []struct {
+		name   string
+		actual string
+		want   bool
+	}{
+		{name: "exact", actual: "19", want: true},
+		{name: "positive inside boundary", actual: "19.99", want: true},
+		{name: "negative sign is ignored", actual: "-18.01", want: true},
+		{name: "boundary is strict", actual: "20", want: false},
+		{name: "outside", actual: "20.01", want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			actual := decimal.RequireFromString(test.actual)
+			if got := vatAmountWithinOfficialTolerance(actual, expected); got != test.want {
+				t.Fatalf("vatAmountWithinOfficialTolerance(%s, %s) = %v, want %v", actual, expected, got, test.want)
+			}
+		})
 	}
 }
 
@@ -795,6 +821,55 @@ func TestCheckBRO_BR_CO_15_Invalid(t *testing.T) {
 	}
 }
 
+func TestBRCO15ParsedCIIMatchesPinnedSchematronAlternatives(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		taxTotals     []taxTotalXML
+		grandTotal    decimal.Decimal
+		wantViolation bool
+	}{
+		{
+			name:       "tax inclusive total may equal tax basis total",
+			taxTotals:  []taxTotalXML{{currency: "EUR", amount: decimal.NewFromInt(19)}},
+			grandTotal: decimal.NewFromInt(100),
+		},
+		{
+			name:       "tax inclusive total may include invoice currency tax",
+			taxTotals:  []taxTotalXML{{currency: "EUR", amount: decimal.NewFromInt(19)}},
+			grandTotal: decimal.NewFromInt(119),
+		},
+		{
+			name:          "tax inclusive total matching neither alternative fails",
+			taxTotals:     []taxTotalXML{{currency: "EUR", amount: decimal.NewFromInt(19)}},
+			grandTotal:    decimal.NewFromInt(110),
+			wantViolation: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			inv := &Invoice{
+				SchemaType:          CII,
+				InvoiceCurrencyCode: "EUR",
+				TaxBasisTotal:       decimal.NewFromInt(100),
+				TaxTotal:            decimal.NewFromInt(19),
+				GrandTotal:          test.grandTotal,
+				DuePayableAmount:    test.grandTotal,
+				isParsed:            true,
+				taxTotalsXML:        test.taxTotals,
+			}
+			inv.validateCalculations()
+			if got := slices.ContainsFunc(inv.violations, func(v SemanticError) bool {
+				return v.Rule.Code == rules.BRCO15.Code
+			}); got != test.wantViolation {
+				t.Fatalf("BR-CO-15 violation = %v, want %v; violations=%#v", got, test.wantViolation, inv.violations)
+			}
+		})
+	}
+}
+
 // TestCheckBRO_BR_CO_16_Valid tests that BR-CO-16 validation passes when DuePayableAmount is correct
 func TestCheckBRO_BR_CO_16_Valid(t *testing.T) {
 	inv := &Invoice{
@@ -1207,12 +1282,13 @@ func TestBR52_SupportingDocumentMustHaveReference(t *testing.T) {
 // TestBR53_TaxAccountingCurrencyRequiresTotalVAT tests BR-53
 func TestBR53_TaxAccountingCurrencyRequiresTotalVAT(t *testing.T) {
 	inv := Invoice{
+		isParsed: true,
 		GuidelineSpecifiedDocumentContextParameter: SpecFacturXBasic,
 		InvoiceNumber:       "TEST-BR53",
 		InvoiceTypeCode:     380,
 		InvoiceDate:         time.Now(),
 		InvoiceCurrencyCode: "EUR",
-		TaxCurrencyCode:     "USD", // Specified but TaxTotalAccounting is zero
+		TaxCurrencyCode:     "USD", // Specified but BT-111 is absent.
 		LineTotal:           decimal.NewFromInt(100),
 		TaxBasisTotal:       decimal.NewFromInt(100),
 		GrandTotal:          decimal.NewFromInt(119),
@@ -1260,7 +1336,15 @@ func TestBR53_TaxAccountingCurrencyRequiresTotalVAT(t *testing.T) {
 	}
 
 	if !br53Found {
-		t.Error("Expected BR-53 violation when tax currency is specified but tax total VAT is zero")
+		t.Error("Expected BR-53 violation when tax currency is specified but BT-111 is absent")
+	}
+
+	inv.hasTaxTotalAccountingXML = true
+	_ = inv.Validate()
+	for _, violation := range inv.violations {
+		if violation.Rule.Code == "BR-53" {
+			t.Error("BR-53 must accept a present BT-111 amount whose value is zero")
+		}
 	}
 }
 
@@ -1976,6 +2060,18 @@ func TestBRCO9_VATIdentifierPrefix(t *testing.T) {
 			taxRepVAT:     "",
 			wantViolation: false,
 			checkField:    "buyer",
+		},
+		{
+			name:          "valid: Kosovo temporary 1A prefix",
+			sellerVAT:     "1A123456789",
+			wantViolation: false,
+			checkField:    "seller",
+		},
+		{
+			name:          "invalid: unassigned uppercase prefix",
+			sellerVAT:     "ZZ123456789",
+			wantViolation: true,
+			checkField:    "seller",
 		},
 		{
 			name:          "invalid: seller starts with digit",

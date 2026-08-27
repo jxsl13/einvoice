@@ -1,89 +1,45 @@
-# Conformance roadmap
+# Conformance status
 
-This fork is not yet approved as an authoritative fiscal-issuance validator.
-Its purpose is to reach reproducible native-Go parity with the official German
-XRechnung validation configuration while keeping all release artifacts and
-production consumers Java-free.
+The stable native-Go rule pack `xrechnung-3.0.2-2026-01-31` validates standard
+XRechnung 3.0.2 invoices in UBL 2.1 Invoice, UBL 2.1 CreditNote, and UN/CEFACT
+CII D16B syntax. It embeds the required XML schemas and performs no filesystem
+or network resolution at runtime.
 
-## Pinned oracle baseline
+Extension and CVD customization identifiers are deliberately rejected as
+unsupported. The legacy `bootstrap-0` rule pack remains available for
+compatibility and is not a conformance claim.
 
-The machine-readable source of truth is
-[`.github/dependencies/parity.json`](.github/dependencies/parity.json). A weekly
-dependency job verifies the latest three release assets by SHA-256 and opens a
-protected auto-merge pull request whenever a pin changes.
+## Reproducible evidence
 
-| Artifact | Version | SHA-256 |
-| --- | --- | --- |
-| [KoSIT Validator](https://github.com/itplr-kosit/validator/releases/tag/v1.6.3) | 1.6.3 standalone | `799e64befca97d4080e03608c80b85dd5a5ecc5f4ae4f35d1116ec2855b9a7c9` |
-| [XRechnung configuration](https://github.com/itplr-kosit/validator-configuration-xrechnung/releases/tag/v2026-01-31) | XRechnung 3.0.2, 2026-01-31 | `6a5a5911a421b25fbc423f62f93f894df7b236f5d73ca4f84bb222a945082704` |
-| [XRechnung Schematron](https://github.com/itplr-kosit/xrechnung-schematron/releases/tag/v2.5.0) | 2.5.0 | `a0f3d82737759bee8591c298ff24983a8f1c667f85e45a34863c75a242bc6f43` |
+The complete checksum-pinned toolchain is recorded in
+`.github/dependencies/parity.json`. Java is used only as an ephemeral,
+network-isolated differential oracle in CI. No Java source, bytecode, archive,
+runtime, or container layer is part of this Go module or its release assets.
 
-The validator and configuration run only as an isolated differential-test
-oracle. They are downloaded by checksum into an ephemeral job and are absent
-from this Go module, module archives, release assets, and consuming systems.
+The checked-in report at `conformance/xrechnung-3.0.2-report.json` records:
 
-## Measured baseline
+- 451 of 451 supported documents with matching acceptance verdicts;
+- 342 of 342 matching fatal/error rule IDs;
+- zero false accepts;
+- 67 Extension/CVD documents skipped as explicitly unsupported;
+- 71 CII and 76 UBL predicates in the immutable official rule inventory.
 
-At fork creation from upstream commit
-`4042b0c17014239cb9da1e1042f5b9951dc1d49a`:
+CI regenerates the rule inventory, recreates the XML Mutate witnesses, runs the
+pinned KoSIT oracle, and reruns the native-Go comparison. It requires at least
+99.9% verdict and fatal/error finding parity and permits no false accepts.
 
-- the root package passed race-enabled tests at 93.7% statement coverage;
-- the complete module reported 81.2% because command and generator packages are
-  largely untested;
-- the code declared 348 rule IDs;
-- exact ID inventory covered 34 of 37 standard CII XRechnung IDs and 33 of 34
-  standard UBL IDs from Schematron 2.5.0;
-- the explicit standard gaps were CII BR-TMP-4, BR-TMP-5, BR-TMP-7 and UBL
-  BR-TMP-6;
-- ID presence is not semantic parity. The current IBAN helper, for example,
-  checks structure but not the official modulo-97 condition.
+## Blocking release gates
 
-## Production-candidate gates
+- every enabled standard/PEPPOL predicate mapped for both claimed syntaxes;
+- at least 99.9% normalized KoSIT verdict and fatal/error rule-ID parity;
+- zero native-Go false accepts where KoSIT rejects;
+- at least 90% statement coverage in every production package;
+- race tests, fuzz smoke tests, static analysis, vulnerability scanning, and
+  checksum verification;
+- no runtime external resolution and no Java artifacts in module or release;
+- signed semantic-version tag, source archive checksums, SPDX SBOM, and
+  published conformance evidence.
 
-Every gate is blocking:
-
-- 100% of enabled official rule IDs mapped for every claimed syntax/profile;
-- at least one passing and one single-condition failing witness per rule and
-  applicable syntax;
-- at least 95% statement coverage in production packages, with no package below
-  90%;
-- 100% true/false outcome coverage for each enabled predicate;
-- at least 90% mutation score in rule and normalization packages;
-- at least 99.9% normalized KoSIT acceptance and finding parity;
-- zero native-Go false accepts where KoSIT reports fatal/error rejection;
-- zero untriaged differential mismatches, races, panics, external resolution,
-  unbounded inputs, or prohibited artifacts;
-- signed semantic-version tag, checksums, SPDX SBOM, corpus provenance,
-  conformance JSON, license scan, and vulnerability scan.
-
-The current 90% CI floor is a bootstrap floor, not the production threshold.
-
-## Current implementation progress
-
-The project now exposes a `validator` package with a context-aware API, typed
-operational errors, deterministic localization-neutral findings, an explicitly
-non-authoritative `bootstrap-0` rule pack, and pre-parse ceilings for bytes,
-depth, element count, attributes, text nodes, and returned findings. It rejects
-DTD directives, non-declaration processing instructions, XInclude, unknown
-roots, duplicate profile declarations, unsupported profiles, and unsupported
-rule packs before business-rule validation. Hostile-input tests, race tests,
-and a dedicated fuzz target cover this boundary.
-
-This completes only the API and initial resource-boundary portion of the
-roadmap. It does not satisfy rule inventory, witness, mutation, differential
-parity, false-accept, provenance, supply-chain, or adviser-acceptance gates and
-does not change the module's fiscal-conformance status.
-
-## Implementation sequence
-
-1. Add a bounded context-aware validation API and deterministic typed findings.
-2. Generate a reviewed rule inventory from pinned official artifacts.
-3. Harden CII/UBL parsing and structural validation without external resolution.
-4. Close standard XRechnung ID and semantic gaps.
-5. Build licensed positive, negative, mutation, and malformed-input corpora.
-6. Normalize KoSIT reports and run deterministic differential testing.
-7. Reach coverage, mutation, fuzzing, security, and supply-chain gates.
-8. Publish a signed pre-release with reproducible conformance evidence.
-
-Extension and CVD profiles must either reach the same complete gates or be
-rejected explicitly as unsupported. Partial profile claims are prohibited.
+Passing validation is technical evidence against the pinned rule set, not tax
+or legal advice. Invoice issuers remain responsible for the underlying facts
+and all applicable retention, authenticity, integrity, and tax obligations.

@@ -3,9 +3,12 @@ package validator
 import "fmt"
 
 const (
-	// RulePackBootstrap identifies the current pre-conformance rule set. It is
-	// immutable once published but is not approved for authoritative issuance.
+	// RulePackBootstrap identifies the legacy compatibility rule set. It is
+	// immutable once published and is not a conformance claim.
 	RulePackBootstrap = "bootstrap-0"
+	// RulePackXRechnung302 identifies the production XRechnung 3.0.2 rule set
+	// pinned to the KoSIT 2026-01-31 configuration.
+	RulePackXRechnung302 = "xrechnung-3.0.2-2026-01-31"
 
 	// HardMaxBytes is the largest XML input accepted by the bounded API.
 	HardMaxBytes int64 = 5 << 20
@@ -140,7 +143,7 @@ func normalizeOptions(options Options) (limits, error) {
 	if value.rulePack == "" {
 		value.rulePack = RulePackBootstrap
 	}
-	if value.rulePack != RulePackBootstrap {
+	if value.rulePack != RulePackBootstrap && value.rulePack != RulePackXRechnung302 {
 		return limits{}, failure(ErrorUnsupportedRulePack, "rule_pack", nil)
 	}
 	if value.maxBytes == 0 {

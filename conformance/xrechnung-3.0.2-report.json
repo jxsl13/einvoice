@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "rulePack": "xrechnung-3.0.2-2026-01-31",
+  "scope": {
+    "profile": "XRechnung 3.0.2",
+    "syntaxes": ["CII D16B", "UBL 2.1 Invoice", "UBL 2.1 CreditNote"],
+    "supportedGroups": ["infrastructure", "standard", "peppol"],
+    "unsupportedGroups": ["extension", "cvd"]
+  },
+  "oracle": {
+    "validatorVersion": "v1.6.3",
+    "configurationVersion": "v2026-01-31",
+    "runtimeImage": "eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037",
+    "networkDuringExecution": false
+  },
+  "differential": {
+    "documents": 451,
+    "verdictMatches": 451,
+    "verdictParity": 1.0,
+    "fatalOrErrorRuleIdsCompared": 342,
+    "fatalOrErrorRuleIdMatches": 342,
+    "fatalOrErrorRuleIdParity": 1.0,
+    "falseAccepts": 0,
+    "skippedUnsupportedProfileDocuments": 67,
+    "corpora": [
+      {"name": "configuration XML Mutate witnesses", "documents": 91, "verdictMatches": 91, "ruleIdsCompared": 96, "ruleIdMatches": 96},
+      {"name": "official standard positive suite", "documents": 78, "verdictMatches": 78, "ruleIdsCompared": 0, "ruleIdMatches": 0},
+      {"name": "official Schematron full-document witnesses", "documents": 282, "verdictMatches": 282, "ruleIdsCompared": 246, "ruleIdMatches": 246}
+    ]
+  },
+  "inventory": {
+    "ciiPredicates": 71,
+    "ublPredicates": 76,
+    "source": "xrechnung-3.0.2-rules.json"
+  },
+  "embeddedSchemas": {
+    "archive": "internal/xsdvalidate/schemas.zip",
+    "sha256": "6cb04c5976d9ab5651d38fd7af9bd84877176bb5c5cbe2076844a65b5a9295dd",
+    "manifest": "internal/xsdvalidate/schemas.json",
+    "generatorGoVersion": "1.26.6",
+    "externalResolution": false
+  },
+  "gates": {
+    "minimumVerdictParity": 0.999,
+    "minimumFatalOrErrorRuleIdParity": 0.999,
+    "maximumFalseAccepts": 0,
+    "minimumProductionPackageStatementCoverage": 0.9
+  }
+}

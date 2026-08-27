@@ -2,16 +2,19 @@ package einvoice
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/jxsl13/einvoice/rules"
 	"github.com/shopspring/decimal"
 )
 
+const en16931VATCountryPrefixes = " 1A AD AE AF AG AI AL AM AN AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH EL ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS XI YE YT ZA ZM ZW "
+
 func (inv *Invoice) validateCalculations() {
 	var sum decimal.Decimal
 
 	// BR-CO-9 VAT identifier country prefix validation
-	// VAT identifiers shall have ISO 3166-1 alpha-2 country prefix (e.g., DE, FR, GB). Greece may use 'EL' or 'GR'.
+	// VAT identifiers shall use the exact code set pinned by EN 16931 1.3.15.
 	validateVATIDPrefix := func(vatID string, fieldName string) {
 		if vatID == "" {
 			return // Empty VAT IDs are handled by other rules
@@ -20,13 +23,10 @@ func (inv *Invoice) validateCalculations() {
 			inv.addViolation(rules.BRCO9, fieldName+" must have at least 2-character country prefix")
 			return
 		}
-		// Extract first 2 characters as potential country code
 		prefix := vatID[:2]
-		// Check if it's uppercase letters (basic validation for country code format)
-		if prefix[0] < 'A' || prefix[0] > 'Z' || prefix[1] < 'A' || prefix[1] > 'Z' {
-			inv.addViolation(rules.BRCO9, fmt.Sprintf("%s must start with 2-letter ISO 3166-1 alpha-2 country code (got: %s)", fieldName, prefix))
+		if !strings.Contains(en16931VATCountryPrefixes, " "+prefix+" ") {
+			inv.addViolation(rules.BRCO9, fmt.Sprintf("%s has an unsupported EN 16931 country prefix (got: %s)", fieldName, prefix))
 		}
-		// Note: Full validation against all valid ISO codes would require maintaining a complete list
 	}
 
 	validateVATIDPrefix(inv.Seller.VATaxRegistration, "Seller VAT identifier (BT-31)")
@@ -83,8 +83,11 @@ func (inv *Invoice) validateCalculations() {
 			if inv.LineTotal.Sub(sum).Abs().GreaterThan(tolerance) {
 				inv.addViolation(rules.BRFXEXTCO10, fmt.Sprintf("Line total %s does not match sum of invoice lines %s (tolerance %s)", inv.LineTotal.String(), sum.String(), tolerance.String()))
 			}
-		} else if !inv.LineTotal.Equal(sum) {
-			inv.addViolation(rules.BRCO10, fmt.Sprintf("Line total %s does not match sum of invoice lines %s", inv.LineTotal.String(), sum.String()))
+		} else {
+			roundedSum := roundHalfUp(sum, 2)
+			if !inv.LineTotal.Equal(roundedSum) {
+				inv.addViolation(rules.BRCO10, fmt.Sprintf("Line total %s does not match rounded sum of invoice lines %s", inv.LineTotal.String(), roundedSum.String()))
+			}
 		}
 	}
 
@@ -137,7 +140,22 @@ func (inv *Invoice) validateCalculations() {
 			inv.checkContext()
 			calculatedTaxTotal = calculatedTaxTotal.Add(inv.TradeTaxes[i].CalculatedAmount)
 		}
-		if !inv.TaxTotal.Equal(calculatedTaxTotal) {
+		if inv.isParsed && inv.SchemaType == CII && inv.GuidelineSpecifiedDocumentContextParameter == SpecXRechnung30 {
+			for _, total := range inv.taxTotalsXML {
+				if total.currency != inv.InvoiceCurrencyCode {
+					continue
+				}
+				if !total.amount.Equal(roundHalfUp(calculatedTaxTotal, 2)) {
+					inv.addViolation(rules.BRCO14, fmt.Sprintf("Invoice total VAT amount %s does not match sum of VAT category amounts %s", total.amount.String(), calculatedTaxTotal.String()))
+				}
+			}
+		} else if inv.isParsed && inv.SchemaType == UBL {
+			for _, total := range inv.taxTotalsXML {
+				if total.hasTaxSubtotal && !total.amount.Equal(roundHalfUp(total.subtotalSum, 2)) {
+					inv.addViolation(rules.BRCO14, fmt.Sprintf("Invoice total VAT amount %s does not match its VAT subtotal sum %s", total.amount.String(), total.subtotalSum.String()))
+				}
+			}
+		} else if !inv.TaxTotal.Equal(calculatedTaxTotal) {
 			inv.addViolation(rules.BRCO14, fmt.Sprintf("Invoice total VAT amount %s does not match sum of VAT category amounts %s", inv.TaxTotal.String(), calculatedTaxTotal.String()))
 		}
 	}
@@ -148,7 +166,32 @@ func (inv *Invoice) validateCalculations() {
 	// Per EN 16931 schematron: TaxInclusiveAmount = round((TaxExclusiveAmount + TaxAmount) * 100) / 100
 	// This applies 2-decimal rounding to the calculated side to account for rounding during invoice generation
 	expectedGrandTotal := roundHalfUp(inv.TaxBasisTotal.Add(inv.TaxTotal), 2)
-	if !inv.GrandTotal.Equal(expectedGrandTotal) {
+	validGrandTotal := inv.GrandTotal.Equal(expectedGrandTotal)
+	if inv.isParsed && inv.SchemaType == UBL {
+		invoiceCurrencyTotals := 0
+		invoiceCurrencyTaxTotal := decimal.Zero
+		for _, total := range inv.taxTotalsXML {
+			if total.currency == inv.InvoiceCurrencyCode {
+				invoiceCurrencyTotals++
+				invoiceCurrencyTaxTotal = total.amount
+			}
+		}
+		expectedGrandTotal = roundHalfUp(inv.TaxBasisTotal.Add(invoiceCurrencyTaxTotal), 2)
+		validGrandTotal = invoiceCurrencyTotals == 1 && inv.GrandTotal.Equal(expectedGrandTotal)
+	} else if inv.isParsed && inv.SchemaType == CII {
+		invoiceCurrencyTotals := 0
+		invoiceCurrencyTaxTotal := decimal.Zero
+		for _, total := range inv.taxTotalsXML {
+			if total.currency == inv.InvoiceCurrencyCode {
+				invoiceCurrencyTotals++
+				invoiceCurrencyTaxTotal = total.amount
+			}
+		}
+		expectedGrandTotal = roundHalfUp(inv.TaxBasisTotal.Add(invoiceCurrencyTaxTotal), 2)
+		validGrandTotal = inv.GrandTotal.Equal(inv.TaxBasisTotal) ||
+			(invoiceCurrencyTotals == 1 && inv.GrandTotal.Equal(expectedGrandTotal))
+	}
+	if !validGrandTotal {
 		inv.addViolation(rules.BRCO15, fmt.Sprintf("Grand total %s does not match TaxBasisTotal + TaxTotal = %s", inv.GrandTotal.String(), expectedGrandTotal.String()))
 	}
 
@@ -194,7 +237,7 @@ func (inv *Invoice) validateCalculations() {
 	for i := range inv.TradeTaxes {
 		inv.checkContext()
 		expected := roundHalfUp(inv.TradeTaxes[i].BasisAmount.Mul(inv.TradeTaxes[i].Percent).Div(decimal100), 2)
-		if !inv.TradeTaxes[i].CalculatedAmount.Equal(expected) {
+		if !vatAmountWithinOfficialTolerance(inv.TradeTaxes[i].CalculatedAmount, expected) {
 			inv.addViolation(rules.BRCO17, fmt.Sprintf("VAT category tax amount %s does not match expected %s (basis %s × rate %s ÷ 100)", inv.TradeTaxes[i].CalculatedAmount.String(), expected.String(), inv.TradeTaxes[i].BasisAmount.String(), inv.TradeTaxes[i].Percent.String()))
 		}
 	}
@@ -253,6 +296,10 @@ func (inv *Invoice) validateCalculations() {
 	// - BR-38: Charges must have reason (BT-104) OR code (BT-105)
 	// - BR-42: Line allowances must have reason (BT-139) OR code (BT-140)
 	// - BR-44: Line charges must have reason (BT-144) OR code (BT-145)
+}
+
+func vatAmountWithinOfficialTolerance(actual, expected decimal.Decimal) bool {
+	return actual.Abs().Sub(expected.Abs()).Abs().LessThan(decimal.NewFromInt(1))
 }
 
 func (inv *Invoice) validateCore() {
@@ -506,18 +553,6 @@ func (inv *Invoice) validateCore() {
 		}
 	}
 
-	// Initialize applicableTradeTaxes map for BR-45 validation
-	// Use composite key of CategoryCode + Percent to properly group by tax category
-	applicableTradeTaxes := make(map[string]decimal.Decimal, len(inv.TradeTaxes))
-	for i := range inv.InvoiceLines {
-		inv.checkContext()
-		if !inv.InvoiceLines[i].isDetailLine() {
-			continue
-		}
-		key := inv.InvoiceLines[i].TaxCategoryCode + "_" + inv.InvoiceLines[i].TaxRateApplicablePercent.String()
-		applicableTradeTaxes[key] = applicableTradeTaxes[key].Add(inv.InvoiceLines[i].Total)
-	}
-
 	for i := range inv.SpecifiedTradeAllowanceCharge {
 		inv.checkContext()
 		// BR-66 Specified Trade Allowance Charge
@@ -526,20 +561,12 @@ func (inv *Invoice) validateCore() {
 		// so this rule is implicitly satisfied. This validation is kept for documentation
 		// and to align with the EN 16931 specification.
 
-		// Add to applicableTradeTaxes for BR-45 validation
-		key := inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxCategoryCode + "_" + inv.SpecifiedTradeAllowanceCharge[i].CategoryTradeTaxRateApplicablePercent.String()
-		amount := inv.SpecifiedTradeAllowanceCharge[i].ActualAmount
-		if !inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator {
-			amount = amount.Neg()
-		}
-		applicableTradeTaxes[key] = applicableTradeTaxes[key].Add(amount)
-
 		if inv.SpecifiedTradeAllowanceCharge[i].ChargeIndicator {
 			// BR-36 Zuschläge auf Dokumentenebene
 			// Jede Abgabe auf Dokumentenebene "DOCUMENT LEVEL CHARGES" (BG-21) muss einen Betrag "Document level charge amount" (BT-99)
 			// aufweisen.
-			if inv.SpecifiedTradeAllowanceCharge[i].ActualAmount.IsZero() {
-				inv.addViolation(rules.BR36, "Charge must not be zero")
+			if inv.isParsed && !inv.SpecifiedTradeAllowanceCharge[i].hasActualAmountInXML {
+				inv.addViolation(rules.BR36, "Charge amount is missing")
 			}
 
 			// BR-37 Zuschläge auf Dokumentenebene
@@ -553,6 +580,7 @@ func (inv *Invoice) validateCore() {
 			// oder einen entsprechenden Code "Document level charge reason code" (BT-105) aufweisen.
 			if inv.SpecifiedTradeAllowanceCharge[i].Reason == "" && inv.SpecifiedTradeAllowanceCharge[i].ReasonCode == "" {
 				inv.addViolation(rules.BR38, "Charge reason empty or code unset")
+				inv.addViolation(rules.BRCO22, "Document level charge must have a reason or reason code")
 			}
 			// BR-USER-03 Zuschläge auf Dokumentenebene
 			// Der Betrag einer Abgabe auf Dokumentenebene "Document level charge amount" (BT-99) darf nicht negativ sein.
@@ -570,8 +598,8 @@ func (inv *Invoice) validateCore() {
 			// BR-31 Abschläge auf Dokumentenebene
 			// Jeder Nachlass für die Rechnung als Ganzes "DOCUMENT LEVEL ALLOWANCES" (BG-20) muss einen Betrag "Document level allowance amount"
 			// (BT-92) aufweisen.
-			if inv.SpecifiedTradeAllowanceCharge[i].ActualAmount.IsZero() {
-				inv.addViolation(rules.BR31, "Allowance must not be zero")
+			if inv.isParsed && !inv.SpecifiedTradeAllowanceCharge[i].hasActualAmountInXML {
+				inv.addViolation(rules.BR31, "Allowance amount is missing")
 			}
 			// BR-32 Abschläge auf Dokumentenebene
 			// Jeder Nachlass für die Rechnung als Ganzes "DOCUMENT LEVEL ALLOWANCES" (BG-20) muss einen Umsatzsteuer-Code "Document level
@@ -584,6 +612,7 @@ func (inv *Invoice) validateCore() {
 			// reason" (BT-97) oder einen entsprechenden Code "Document level allowance reason code" (BT-98") aufweisen.
 			if inv.SpecifiedTradeAllowanceCharge[i].Reason == "" && inv.SpecifiedTradeAllowanceCharge[i].ReasonCode == "" {
 				inv.addViolation(rules.BR33, "Allowance reason empty or code unset")
+				inv.addViolation(rules.BRCO21, "Document level allowance must have a reason or reason code")
 			}
 			// BR-USER-01 Abschläge auf Dokumentenebene
 			// Der Betrag eines Nachlasses auf Dokumentenebene "Document level allowance amount" (BT-92) darf nicht negativ sein.
@@ -607,14 +636,15 @@ func (inv *Invoice) validateCore() {
 		// (BT-136) aufweisen.
 		for j := range inv.InvoiceLines[i].InvoiceLineAllowances {
 			inv.checkContext()
-			if inv.InvoiceLines[i].InvoiceLineAllowances[j].ActualAmount.IsZero() {
-				inv.addViolation(rules.BR41, "Line allowance amount zero")
+			if inv.isParsed && !inv.InvoiceLines[i].InvoiceLineAllowances[j].hasActualAmountInXML {
+				inv.addViolation(rules.BR41, "Line allowance amount is missing")
 			}
 			// BR-42 Abschläge auf Ebene der Rechnungsposition
 			// Jeder Nachlass auf der Ebene der Rechnungsposition "INVOICE LINE ALLOWANCES" (BG-27) muss einen Nachlassgrund "Invoice line allowance
 			// reason" (BT-139) oder einen entsprechenden Code "Invoice line allowance reason code" (BT-140) aufweisen.
 			if inv.InvoiceLines[i].InvoiceLineAllowances[j].Reason == "" && inv.InvoiceLines[i].InvoiceLineAllowances[j].ReasonCode == "" {
 				inv.addViolation(rules.BR42, "Line allowance must have a reason")
+				inv.addViolation(rules.BRCO23, "Invoice line allowance must have a reason or reason code")
 			}
 		}
 		for j := range inv.InvoiceLines[i].InvoiceLineCharges {
@@ -622,14 +652,15 @@ func (inv *Invoice) validateCore() {
 			// BR-43 Charge ou frais sur ligne de facture
 			// Jede Abgabe auf der Ebene der Rechnungsposition "INVOICE LINE CHARGES" (BG-28) muss einen Betrag "Invoice line charge amount" (BT-141)
 			// aufweisen.
-			if inv.InvoiceLines[i].InvoiceLineCharges[j].ActualAmount.IsZero() {
-				inv.addViolation(rules.BR43, "Line charge amount zero")
+			if inv.isParsed && !inv.InvoiceLines[i].InvoiceLineCharges[j].hasActualAmountInXML {
+				inv.addViolation(rules.BR43, "Line charge amount is missing")
 			}
 			// BR-44 Charge ou frais sur ligne de facture
 			// Jede Abgabe auf der Ebene der Rechnungsposition "INVOICE LINE CHARGES" (BG-28) muss einen Abgabegrund "Invoice line charge reason" (BT-
 			// 144) oder einen entsprechenden Code "Invoice line charge reason code" (BT-145) aufweisen.
 			if inv.InvoiceLines[i].InvoiceLineCharges[j].Reason == "" && inv.InvoiceLines[i].InvoiceLineCharges[j].ReasonCode == "" {
 				inv.addViolation(rules.BR44, "Line charge must have a reason")
+				inv.addViolation(rules.BRCO24, "Invoice line charge must have a reason or reason code")
 			}
 		}
 	}
@@ -657,13 +688,10 @@ func (inv *Invoice) validateCore() {
 		// Jede Umsatzsteueraufschlüsselung "VAT BREAKDOWN" (BG-23) muss die
 		// Summe aller nach dem jeweiligen Schlüssel zu versteuernden Beträge
 		// "VAT category taxable amount" (BT-116) aufweisen.
-		// Note: This validation only applies to profiles with line items (>= Basic, level 3).
-		// BasicWL profile (level 2) provides BasisAmount directly without line items.
-		if is(levelBasic, inv) {
-			key := inv.TradeTaxes[i].CategoryCode + "_" + inv.TradeTaxes[i].Percent.String()
-			if !applicableTradeTaxes[key].Equal(inv.TradeTaxes[i].BasisAmount) {
-				inv.addViolation(rules.BR45, "Applicable trade tax basis amount not equal to the sum of line total")
-			}
+		// BR-45 is a presence rule. Consistency of the taxable amount with
+		// lines, allowances, and charges is covered by category-specific rules.
+		if inv.isParsed && !inv.TradeTaxes[i].hasBasisAmountInXML {
+			inv.addViolation(rules.BR45, "VAT category taxable amount is missing")
 		}
 		// BR-47 Umsatzsteueraufschlüsselung
 		// Jede Umsatzsteueraufschlüsselung "VAT BREAKDOWN" (BG-23) muss über
@@ -707,20 +735,8 @@ func (inv *Invoice) validateCore() {
 	// Wenn eine Währung für die Umsatzsteuerabrechnung angegeben wurde, muss
 	// der Umsatzsteuergesamtbetrag in der Abrechnungswährung "Invoice total VAT
 	// amount in accounting currency" (BT-111) angegeben werden.
-	if inv.TaxCurrencyCode != "" && inv.TaxTotalAccounting.IsZero() {
+	if inv.TaxCurrencyCode != "" && inv.isParsed && !inv.hasTaxTotalAccountingXML {
 		inv.addViolation(rules.BR53, "Tax total in accounting currency must be specified when tax currency code is provided")
-	}
-
-	// Validate TaxTotalAmount currency consistency
-	// EN 16931 specifies only BT-110 (invoice currency) and BT-111 (accounting currency) are allowed
-	for _, unexpectedCurrency := range inv.unexpectedTaxCurrencies {
-		inv.checkContext()
-		expectedCurrencies := inv.InvoiceCurrencyCode
-		if inv.TaxCurrencyCode != "" {
-			expectedCurrencies += " or " + inv.TaxCurrencyCode
-		}
-		inv.addViolation(rules.UNEXPECTED_TAX_CURRENCY,
-			fmt.Sprintf("TaxTotalAmount with unexpected currency %s (expected %s)", unexpectedCurrency, expectedCurrencies))
 	}
 
 	// BR-54 Artikelattribute

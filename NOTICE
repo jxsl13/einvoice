@@ -12,6 +12,20 @@ This software is licensed under the BSD 3-Clause License. See License.md for det
 
 This product includes the following third-party software:
 
+OASIS Universal Business Language (UBL) 2.1 XML schemas
+Copyright (c) OASIS Open 2013. All Rights Reserved.
+Source: https://docs.oasis-open.org/ubl/os-UBL-2.1/
+The unmodified schema files retain their original notices and are redistributed
+under the terms published with OASIS UBL 2.1.
+
+UN/CEFACT Cross Industry Invoice 100.D16B XML schemas
+Copyright (C) UN/CEFACT (2016). All Rights Reserved.
+Source: https://unece.org/trade/uncefact/xml-schemas
+The unmodified schema files retain the UN/CEFACT copyright and permission
+notice, including the AS-IS warranty disclaimer.
+
+================================================================================
+
 pdfcpu - PDF processor written in Go
 Copyright (c) 2017-2025 Horst Rutter
 Licensed under the Apache License, Version 2.0

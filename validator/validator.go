@@ -8,7 +8,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jacoelho/xsd/xsderrors"
 	einvoice "github.com/jxsl13/einvoice"
+	"github.com/jxsl13/einvoice/internal/xsdvalidate"
 )
 
 // Validate parses and validates one invoice through hard resource ceilings.
@@ -44,6 +46,18 @@ func Validate(ctx context.Context, src io.Reader, options Options) (result Resul
 	if contextErr := ctx.Err(); contextErr != nil {
 		return Result{}, failure(ErrorCanceled, "", contextErr)
 	}
+	if bounded.rulePack == RulePackXRechnung302 {
+		if schemaErr := xsdvalidate.Validate(
+			ctx,
+			data,
+			bounded.maxBytes,
+			bounded.maxDepth,
+			HardMaxAttributes,
+			HardMaxTextBytes,
+		); schemaErr != nil {
+			return schemaFailure(result, schemaErr, ctx.Err())
+		}
+	}
 
 	invoice, parseErr := einvoice.ParseReaderContext(ctx, bytes.NewReader(data))
 	if parseErr != nil {
@@ -59,6 +73,9 @@ func Validate(ctx context.Context, src io.Reader, options Options) (result Resul
 	if err != nil {
 		return Result{}, err
 	}
+	if bounded.rulePack == RulePackXRechnung302 && result.Profile != ProfileXRechnung30 {
+		return Result{}, failure(ErrorUnsupportedProfile, "", nil)
+	}
 	if contextErr := ctx.Err(); contextErr != nil {
 		return Result{}, failure(ErrorCanceled, "", contextErr)
 	}
@@ -70,19 +87,75 @@ func Validate(ctx context.Context, src io.Reader, options Options) (result Resul
 	var semanticErr *einvoice.ValidationError
 	switch {
 	case validationErr == nil:
-		result.Findings = appendSemanticFindings(nil, invoice.Warnings())
-		result.Accepted = true
+		result.Findings = appendSemanticFindings(nil, invoice.Warnings(), invoice.Information())
+		result.Accepted = !hasRejectingXRechnungWarning(result.Findings)
 	case errors.As(validationErr, &semanticErr):
-		result.Findings = appendSemanticFindings(semanticErr.Violations(), semanticErr.Warnings())
-		result.Accepted = semanticErr.Count() == 0
+		result.Findings = appendSemanticFindings(semanticErr.Violations(), semanticErr.Warnings(), semanticErr.Information())
+		result.Accepted = semanticErr.Count() == 0 && !hasRejectingXRechnungWarning(result.Findings)
 	default:
 		return Result{}, failure(ErrorInternal, "rule_validation", nil)
+	}
+	if result.Profile == ProfileXRechnung30 {
+		if empty, emptyErr := hasForbiddenEmptyElement(ctx, data, result.Syntax); emptyErr != nil {
+			return Result{}, failure(ErrorInternal, "empty_element_scan", nil)
+		} else if empty && !hasRule(result.Findings, "PEPPOL-EN16931-R008") {
+			result.Findings = append(result.Findings, Finding{
+				RuleID:      "PEPPOL-EN16931-R008",
+				Severity:    SeverityError,
+				MessageCode: "rule.peppol_en16931_r008",
+			})
+			result.Accepted = false
+		}
 	}
 	if contextErr := ctx.Err(); contextErr != nil {
 		return Result{}, failure(ErrorCanceled, "", contextErr)
 	}
 	result.Findings = boundFindings(result.Findings, bounded.maxFindings)
 	return result, nil
+}
+
+func hasRule(findings []Finding, ruleID string) bool {
+	for _, finding := range findings {
+		if finding.RuleID == ruleID {
+			return true
+		}
+	}
+	return false
+}
+
+func schemaFailure(result Result, schemaErr, contextErr error) (Result, error) {
+	if contextErr != nil || errors.Is(schemaErr, context.Canceled) || errors.Is(schemaErr, context.DeadlineExceeded) {
+		if contextErr == nil {
+			contextErr = schemaErr
+		}
+		return Result{}, failure(ErrorCanceled, "", contextErr)
+	}
+	var diagnostic *xsderrors.Error
+	if !errors.As(schemaErr, &diagnostic) {
+		return Result{}, failure(ErrorInternal, "schema_validation", nil)
+	}
+	if diagnostic.Code == xsderrors.CodeValidationLimit {
+		return Result{}, failure(ErrorResourceLimit, "schema_validation", nil)
+	}
+	if diagnostic.Category != xsderrors.CategoryValidation {
+		return Result{}, failure(ErrorInternal, "schema_validation", nil)
+	}
+	result.Accepted = false
+	result.Findings = []Finding{{RuleID: schemaRuleID, Severity: SeverityError, MessageCode: schemaMsgCode}}
+	return result, nil
+}
+
+func hasRejectingXRechnungWarning(findings []Finding) bool {
+	for _, finding := range findings {
+		if finding.Severity != SeverityWarning {
+			continue
+		}
+		switch finding.RuleID {
+		case "CII-SR-452", "CII-SR-453", "CII-SR-454":
+			return true
+		}
+	}
+	return false
 }
 
 func admittedProfile(profileURN string) (Profile, error) {
@@ -100,13 +173,16 @@ func syntaxMatches(syntax Syntax, legacy einvoice.CodeSchemaType) bool {
 	return syntax == SyntaxCII && legacy == einvoice.CII || syntax == SyntaxUBL && legacy == einvoice.UBL
 }
 
-func appendSemanticFindings(violations, warnings []einvoice.SemanticError) []Finding {
-	findings := make([]Finding, 0, len(violations)+len(warnings))
+func appendSemanticFindings(violations, warnings, information []einvoice.SemanticError) []Finding {
+	findings := make([]Finding, 0, len(violations)+len(warnings)+len(information))
 	for _, violation := range violations {
 		findings = append(findings, semanticFinding(violation, SeverityError))
 	}
 	for _, warning := range warnings {
 		findings = append(findings, semanticFinding(warning, SeverityWarning))
+	}
+	for _, info := range information {
+		findings = append(findings, semanticFinding(info, SeverityInfo))
 	}
 	return findings
 }

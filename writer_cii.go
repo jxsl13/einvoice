@@ -254,6 +254,9 @@ func writeCIIramIncludedSupplyChainTradeLineItem(invoiceLine *InvoiceLine, inv *
 	if invoiceLine.AdditionalReferencedDocumentID != "" {
 		addDoc := slts.CreateElement("ram:AdditionalReferencedDocument")
 		addDoc.CreateElement("ram:IssuerAssignedID").SetText(invoiceLine.AdditionalReferencedDocumentID)
+		if invoiceLine.AdditionalReferencedDocumentTypeCode != "" {
+			addDoc.CreateElement("ram:TypeCode").SetText(invoiceLine.AdditionalReferencedDocumentTypeCode)
+		}
 	}
 }
 
@@ -393,6 +396,9 @@ func writeCIIramApplicableHeaderTradeAgreement(inv *Invoice, parent *etree.Eleme
 	for i := range inv.AdditionalReferencedDocument {
 		ard := elt.CreateElement("ram:AdditionalReferencedDocument")
 		ard.CreateElement("ram:IssuerAssignedID").SetText(inv.AdditionalReferencedDocument[i].IssuerAssignedID)
+		if inv.AdditionalReferencedDocument[i].URIID != "" {
+			ard.CreateElement("ram:URIID").SetText(inv.AdditionalReferencedDocument[i].URIID)
+		}
 		ard.CreateElement("ram:TypeCode").SetText(inv.AdditionalReferencedDocument[i].TypeCode)
 		if inv.AdditionalReferencedDocument[i].Name != "" {
 			ard.CreateElement("ram:Name").SetText(inv.AdditionalReferencedDocument[i].Name)

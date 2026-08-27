@@ -1,10 +1,16 @@
 package einvoice
 
 import (
+	"regexp"
 	"strings"
 	"unicode"
 
 	"github.com/jxsl13/einvoice/rules"
+)
+
+const (
+	specXRechnungExtension30 = SpecXRechnung30 + "#conformant#urn:xeinkauf.de:kosit:extension:xrechnung_3.0"
+	specXRechnungCVD09       = SpecXRechnung30 + "#compliant#urn:xeinkauf.de:kosit:xrechnung:cvd_0.9"
 )
 
 // validateGerman performs German XRechnung-specific business rule validation.
@@ -50,6 +56,12 @@ import (
 //
 // Reference: https://github.com/itplr-kosit/xrechnung-schematron
 func (inv *Invoice) validateGerman() {
+	if inv.GuidelineSpecifiedDocumentContextParameter != SpecXRechnung30 &&
+		inv.GuidelineSpecifiedDocumentContextParameter != specXRechnungExtension30 &&
+		inv.GuidelineSpecifiedDocumentContextParameter != specXRechnungCVD09 {
+		inv.addWarning(rules.BRDE21, "Specification identifier is not a current XRechnung 3.0 profile")
+	}
+
 	// BR-DE-1: Payment instructions (BG-16) must be provided
 	if len(inv.PaymentMeans) == 0 {
 		inv.addViolation(rules.BRDE1, "An invoice must contain information on PAYMENT INSTRUCTIONS (BG-16)")
@@ -127,6 +139,62 @@ func (inv *Invoice) validateGerman() {
 		inv.addViolation(rules.BRDE15, "The element 'Buyer reference' (BT-10) must be transmitted")
 	}
 
+	for i := range inv.TradeTaxes {
+		if inv.isParsed && !inv.TradeTaxes[i].hasPercentInXML {
+			inv.addViolation(rules.BRDE14, "VAT category rate (BT-119) must be present")
+		}
+	}
+
+	if !strings.Contains(" 326 380 384 389 381 875 876 877 ", " "+inv.InvoiceTypeCode.String()+" ") {
+		inv.addWarning(rules.BRDE17, "Invoice type code is outside the XRechnung recommended set")
+	}
+
+	for _, terms := range inv.SpecifiedTradePaymentTerms {
+		if !validSkontoDescription(terms.Description) {
+			inv.addViolation(rules.BRDE18, "Discount payment-terms line does not match the XRechnung syntax")
+			break
+		}
+	}
+
+	filenames := make(map[string]struct{})
+	for _, document := range inv.AdditionalReferencedDocument {
+		if document.AttachmentFilename != "" {
+			if _, duplicate := filenames[document.AttachmentFilename]; duplicate {
+				inv.addViolation(rules.BRDE22, "Embedded attachment filenames must be unique")
+				break
+			}
+			filenames[document.AttachmentFilename] = struct{}{}
+		}
+		if document.URIID != "" && !validXRechnungURL(document.URIID) {
+			inv.addWarning(rules.BRTMP2, "External document location must be an absolute URI")
+		}
+	}
+
+	if inv.SchemaType == CII {
+		for i := range inv.InvoiceLines {
+			line := &inv.InvoiceLines[i]
+			if line.hasNetBasisQuantityInXML && line.hasGrossBasisQuantityInXML &&
+				(!line.BasisQuantity.Equal(line.grossBasisQuantity) ||
+					(line.BasisQuantityUnit != "" && line.grossBasisQuantityUnit != "" && line.BasisQuantityUnit != line.grossBasisQuantityUnit)) {
+				inv.addViolation(rules.BRTMP3, "Gross and net price base quantities must agree")
+			}
+		}
+	}
+
+	hasDeliveryOrPeriod := !inv.OccurrenceDateTime.IsZero() || inv.hasBillingPeriodInXML
+	if !hasDeliveryOrPeriod {
+		hasDeliveryOrPeriod = true
+		for i := range inv.InvoiceLines {
+			if !inv.InvoiceLines[i].linePeriodPresent {
+				hasDeliveryOrPeriod = false
+				break
+			}
+		}
+	}
+	if !hasDeliveryOrPeriod {
+		inv.addInfo(rules.BRDETMP32, "Delivery date or an invoice/line period is recommended")
+	}
+
 	// BR-DE-16: When tax codes S, Z, E, AE, K, G, L or M are used, at least one of
 	// Seller VAT identifier (BT-31), Seller tax registration identifier (BT-32)
 	// or SELLER TAX REPRESENTATIVE PARTY (BG-11) must be provided
@@ -175,10 +243,18 @@ func (inv *Invoice) validateGerman() {
 	for i := range inv.PaymentMeans {
 		inv.checkContext()
 		// Determine which payment information groups are present
-		hasBG17CreditTransfer := inv.PaymentMeans[i].PayeePartyCreditorFinancialAccountIBAN != "" ||
+		hasBG17CreditTransfer := inv.PaymentMeans[i].hasPayeeAccountInXML || inv.PaymentMeans[i].PayeePartyCreditorFinancialAccountIBAN != "" ||
 			inv.PaymentMeans[i].PayeePartyCreditorFinancialAccountProprietaryID != ""
-		hasBG18PaymentCard := inv.PaymentMeans[i].ApplicableTradeSettlementFinancialCardID != ""
-		hasBG19DirectDebit := inv.PaymentMeans[i].PayerPartyDebtorFinancialAccountIBAN != ""
+		hasBG18PaymentCard := inv.PaymentMeans[i].hasPaymentCardInXML || inv.PaymentMeans[i].ApplicableTradeSettlementFinancialCardID != ""
+		hasBG19DirectDebit := inv.PaymentMeans[i].hasPaymentMandateInXML || inv.PaymentMeans[i].hasPayerAccountIDInXML || inv.PaymentMeans[i].PayerPartyDebtorFinancialAccountIBAN != ""
+		hasForbiddenBRDE25BG17 := hasBG17CreditTransfer
+		if inv.SchemaType == CII {
+			hasBG19DirectDebit = hasBG19DirectDebit || inv.CreditorReferenceID != "" || hasDirectDebitMandate(inv.SpecifiedTradePaymentTerms)
+			// The pinned CII mapping for BR-DE-25-b explicitly treats both
+			// financial-institution elements as forbidden BG-17 content.
+			hasForbiddenBRDE25BG17 = hasForbiddenBRDE25BG17 ||
+				inv.PaymentMeans[i].hasPayeeInstitutionInXML || inv.PaymentMeans[i].hasPayerInstitutionInXML
+		}
 
 		// BR-DE-23: Credit transfer (codes 30, 58)
 		if inv.PaymentMeans[i].TypeCode == 30 || inv.PaymentMeans[i].TypeCode == 58 {
@@ -220,7 +296,7 @@ func (inv *Invoice) validateGerman() {
 			}
 
 			// BR-DE-25-b: Must NOT have BG-17 (credit transfer) or BG-18 (payment card)
-			if hasBG17CreditTransfer {
+			if hasForbiddenBRDE25BG17 {
 				inv.addViolation(rules.BRDE25B, "Payment means code 59 (direct debit) must not contain BG-17 CREDIT TRANSFER")
 			}
 			if hasBG18PaymentCard {
@@ -242,25 +318,95 @@ func (inv *Invoice) validateGerman() {
 			}
 		}
 
-		// BR-DE-30, BR-DE-31: Direct debit mandatory fields
-		if inv.PaymentMeans[i].TypeCode == 59 {
-			// BR-DE-30: Bank assigned creditor identifier (BT-90)
-			if inv.CreditorReferenceID == "" {
-				inv.addViolation(rules.BRDE30, "Bank assigned creditor identifier (BT-90) must be provided for direct debit")
-			}
-
-			// BR-DE-31: Debited account identifier (BT-91)
-			if inv.PaymentMeans[i].PayerPartyDebtorFinancialAccountIBAN == "" {
-				inv.addViolation(rules.BRDE31, "Debited account identifier (BT-91) must be provided for direct debit")
-			}
-		}
 	}
+
+	inv.validateGermanDirectDebitIdentifiers()
 
 	// BR-DE-26: Corrected invoice should reference preceding invoice (warning per XRechnung schematron)
 	if int(inv.InvoiceTypeCode) == 384 {
 		if len(inv.InvoiceReferencedDocument) == 0 {
 			inv.addWarning(rules.BRDE26, "If invoice type code (BT-3) is 384 (Corrected invoice), PRECEDING INVOICE REFERENCE (BG-3) should be provided")
 		}
+	}
+}
+
+var skontoLinePattern = regexp.MustCompile(`^#SKONTO#TAGE=[0-9]+#PROZENT=[0-9]+\.[0-9]{2}(#BASISBETRAG=-?[0-9]+\.[0-9]{2})?#$`)
+
+func validSkontoDescription(description string) bool {
+	lines := strings.Split(strings.ReplaceAll(description, "\r\n", "\n"), "\n")
+	found := false
+	lastSkontoLine := -1
+	for index, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		found = true
+		lastSkontoLine = index
+		if !skontoLinePattern.MatchString(trimmed) {
+			return false
+		}
+	}
+	if !found {
+		return true
+	}
+	return lastSkontoLine < len(lines)-1
+}
+
+func validXRechnungURL(value string) bool {
+	colon := strings.IndexByte(value, ':')
+	if colon < 2 || (value[0] < 'A' || value[0] > 'Z') && (value[0] < 'a' || value[0] > 'z') {
+		return false
+	}
+	for i := 1; i < colon; i++ {
+		character := value[i]
+		if !isAlphanumericAnyCase(character) && character != '+' && character != '.' && character != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+func hasDirectDebitMandate(terms []SpecifiedTradePaymentTerms) bool {
+	for _, term := range terms {
+		if term.DirectDebitMandateID != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func (inv *Invoice) validateGermanDirectDebitIdentifiers() {
+	hasBT89 := hasDirectDebitMandate(inv.SpecifiedTradePaymentTerms)
+	hasBT90 := inv.CreditorReferenceID != ""
+	if inv.SchemaType == UBL {
+		hasBT89 = false
+		hasBT90 = hasPartyIdentifierScheme(inv.Seller, "SEPA") ||
+			(inv.PayeeTradeParty != nil && hasPartyIdentifierScheme(*inv.PayeeTradeParty, "SEPA"))
+	}
+	hasBT91 := false
+	hasBG19 := false
+	for i := range inv.PaymentMeans {
+		paymentMeans := &inv.PaymentMeans[i]
+		if inv.SchemaType == UBL {
+			hasBG19 = hasBG19 || paymentMeans.hasPaymentMandateInXML
+			hasBT89 = hasBT89 || paymentMeans.mandateIDXML != ""
+		} else {
+			hasBG19 = hasBG19 || paymentMeans.hasPayerAccountIDInXML || paymentMeans.PayerPartyDebtorFinancialAccountIBAN != ""
+		}
+		hasBT91 = hasBT91 || paymentMeans.hasPayerAccountIDInXML || paymentMeans.PayerPartyDebtorFinancialAccountIBAN != ""
+	}
+	if inv.SchemaType == CII {
+		hasBG19 = hasBG19 || hasBT89 || hasBT90
+	}
+	if !hasBG19 {
+		return
+	}
+	if !hasBT90 || !hasBT89 && !hasBT91 {
+		inv.addViolation(rules.BRDE30, "Direct debit identifiers do not satisfy BT-90 dependencies")
+	}
+	if !hasBT91 || !hasBT89 && !hasBT90 {
+		inv.addViolation(rules.BRDE31, "Direct debit identifiers do not satisfy BT-91 dependencies")
 	}
 }
 
@@ -333,12 +479,17 @@ func isUppercaseLetter(b byte) bool {
 // This is a simplified validation that checks format. Full validation
 // would include modulo-97 checksum verification per ISO 13616.
 func isValidIBAN(iban string) bool {
-	// Remove spaces and convert to uppercase
-	iban = strings.ReplaceAll(iban, " ", "")
-	iban = strings.ToUpper(iban)
+	// Mirror the pinned XRechnung XPath: remove whitespace, validate the
+	// structural expression, move the first four characters to the end, then
+	// evaluate the resulting decimal stream modulo 97 without big integers.
+	iban = strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, iban)
 
-	// Length check: IBAN must be 15-34 characters (per SWIFT registry)
-	if len(iban) < 15 || len(iban) > 34 {
+	if len(iban) < 4 || len(iban) > 34 {
 		return false
 	}
 
@@ -352,14 +503,33 @@ func isValidIBAN(iban string) bool {
 		return false
 	}
 
-	// Remaining characters must be alphanumeric
+	// Remaining characters must be ASCII alphanumeric. The official XPath
+	// permits either case in the BBAN portion.
 	for i := 4; i < len(iban); i++ {
-		if !isAlphanumeric(iban[i]) {
+		if !isAlphanumericAnyCase(iban[i]) {
 			return false
 		}
 	}
 
-	return true
+	rearranged := iban[4:] + strings.ToUpper(iban[:2]) + iban[2:4]
+	remainder := 0
+	for i := 0; i < len(rearranged); i++ {
+		character := rearranged[i]
+		switch {
+		case isDigit(character):
+			remainder = (remainder*10 + int(character-'0')) % 97
+		case character >= 'A' && character <= 'Z':
+			value := int(character-'A') + 10
+			remainder = (remainder*100 + value) % 97
+		case character >= 'a' && character <= 'z':
+			// XPath maps a codepoint greater than 64 to codepoint-55.
+			value := int(character) - 55
+			remainder = (remainder*100 + value) % 97
+		default:
+			return false
+		}
+	}
+	return remainder == 1
 }
 
 // isDigit checks if a byte represents a digit (0-9).
@@ -370,4 +540,17 @@ func isDigit(b byte) bool {
 // isAlphanumeric checks if a byte represents an alphanumeric character (0-9, A-Z).
 func isAlphanumeric(b byte) bool {
 	return isDigit(b) || isUppercaseLetter(b)
+}
+
+func isAlphanumericAnyCase(b byte) bool {
+	return isAlphanumeric(b) || (b >= 'a' && b <= 'z')
+}
+
+func hasPartyIdentifierScheme(party Party, scheme string) bool {
+	for _, identifier := range party.GlobalID {
+		if identifier.Scheme == scheme && strings.TrimSpace(identifier.ID) != "" {
+			return true
+		}
+	}
+	return false
 }

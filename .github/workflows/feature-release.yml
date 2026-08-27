@@ -1,0 +1,136 @@
+name: Publish manually tagged feature release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing signed semantic-version tag on protected main
+        required: true
+        type: string
+
+permissions:
+  attestations: write
+  contents: write
+  id-token: write
+
+concurrency:
+  group: feature-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Verify tag and publish artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout protected main and tags
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: main
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Verify the existing signed tag targets protected main
+      env:
+        GH_TOKEN: ${{ github.token }}
+        RELEASE_TAG: ${{ inputs.tag }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+        test "$(git cat-file -t "refs/tags/${RELEASE_TAG}")" = tag
+        test "$(git rev-list -n 1 "refs/tags/${RELEASE_TAG}")" = "$(git rev-parse origin/main)"
+        ref="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
+        tag_object="$(jq -er 'select(.object.type == "tag") | .object.sha' <<<"${ref}")"
+        gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}" \
+          --jq 'select(.verification.verified == true)' >/dev/null
+        if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+          echo "Release ${RELEASE_TAG} already exists" >&2
+          exit 1
+        fi
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: '1.26.6'
+        cache: true
+
+    - name: Run release gate
+      shell: bash
+      run: |
+        set -euo pipefail
+        go mod download
+        go mod verify
+        go vet ./...
+        go test -race ./...
+        go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+        if find . -path ./.git -prune -o -type f \
+          \( -name '*.java' -o -name '*.class' -o -name '*.jar' \
+             -o -name '*.jmod' -o -name '*.war' -o -name '*.ear' \
+             -o -name 'pom.xml' -o -name 'build.gradle*' \) \
+          -print -quit | grep -q .; then
+          echo 'Java artifact found in the public module' >&2
+          exit 1
+        fi
+        jq -e '.differential.verdictParity == 1 and .differential.falseAccepts == 0' \
+          conformance/xrechnung-3.0.2-report.json >/dev/null
+
+    - name: Build static CLI and release evidence
+      env:
+        RELEASE_TAG: ${{ inputs.tag }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p dist
+        version="${RELEASE_TAG#v}"
+        for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+          os="${target%/*}"
+          arch="${target#*/}"
+          suffix=""
+          if [[ "${os}" == windows ]]; then suffix='.exe'; fi
+          name="einvoice-${version}-${os}-${arch}${suffix}"
+          CGO_ENABLED=0 GOOS="${os}" GOARCH="${arch}" \
+            go build -trimpath -ldflags='-s -w' -o "dist/${name}" ./cmd/einvoice
+        done
+        git archive --format=tar.gz --prefix="einvoice-${version}/" \
+          --output="dist/einvoice-${version}-source.tar.gz" "${RELEASE_TAG}"
+        cp conformance/xrechnung-3.0.2-report.json "dist/einvoice-${version}-conformance.json"
+        go list -m -json all | jq -s --arg version "${version}" '
+          {
+            spdxVersion:"SPDX-2.3",
+            dataLicense:"CC0-1.0",
+            SPDXID:"SPDXRef-DOCUMENT",
+            name:("einvoice-" + $version),
+            documentNamespace:("https://github.com/jxsl13/einvoice/releases/tag/v" + $version + "/spdx"),
+            creationInfo:{creators:["Tool: go-list+jq"],created:(now | strftime("%Y-%m-%dT%H:%M:%SZ"))},
+            packages:(to_entries | map({
+              name:.value.Path,
+              SPDXID:("SPDXRef-Package-" + (.key|tostring)),
+              versionInfo:(.value.Version // "main"),
+              downloadLocation:"NOASSERTION",
+              filesAnalyzed:false,
+              licenseConcluded:"NOASSERTION",
+              licenseDeclared:"NOASSERTION",
+              copyrightText:"NOASSERTION"
+            }))
+          }
+        ' > "dist/einvoice-${version}.spdx.json"
+        sha256sum dist/* > "dist/einvoice-${version}-checksums.txt"
+
+    - name: Attest all release artifacts
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+      with:
+        subject-path: dist/*
+
+    - name: Publish release for the verified tag
+      env:
+        GH_TOKEN: ${{ github.token }}
+        RELEASE_TAG: ${{ inputs.tag }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        gh release create "${RELEASE_TAG}" dist/* \
+          --verify-tag \
+          --title "${RELEASE_TAG}" \
+          --notes "Stable pure-Go XRechnung 3.0.2 validation for standard UBL 2.1 and CII D16B invoices. Includes checksums, SPDX SBOM, provenance attestations, and the 451-document conformance report. Extension and CVD profiles remain unsupported."

@@ -65,9 +65,11 @@ func (inv *Invoice) sumDetailLineBasis(category string, rate decimal.Decimal, ma
 //
 // In the EXTENDED profile the BR-FXEXT-*-08 rule (fxextRule) replaces the strict
 // BR-*-8 rule (strictRule) and tolerates a deviation of 0.01 per contributing
-// amount (Factur-X 1.09); outside EXTENDED the amounts must match exactly. label
-// is the human-readable category name and rateLabel, when non-empty, the VAT rate
-// appended to the message ("for rate ...").
+// amount (Factur-X 1.09). The EN 16931 UBL binding allows a strict open
+// tolerance of one currency unit for these category-basis predicates, while
+// the CII binding requires exact equality after rounding each contributing
+// sum to two decimals. label is the human-readable category name and rateLabel,
+// when non-empty, the VAT rate appended to the message ("for rate ...").
 func (inv *Invoice) checkVATCategoryBasis(label, rateLabel string, declared, calculated decimal.Decimal, amountCount int, strictRule, fxextRule rules.Rule) {
 	rateSuffix := ""
 	if rateLabel != "" {
@@ -80,7 +82,8 @@ func (inv *Invoice) checkVATCategoryBasis(label, rateLabel string, declared, cal
 		}
 		return
 	}
-	if !declared.Equal(calculated) {
-		inv.addViolation(strictRule, fmt.Sprintf("%s taxable amount must equal sum of line amounts%s (expected %s, got %s)", label, rateSuffix, calculated.String(), declared.String()))
+	delta := declared.Sub(calculated).Abs()
+	if (inv.SchemaType == CII && !delta.IsZero()) || delta.GreaterThanOrEqual(decimal.NewFromInt(1)) {
+		inv.addViolation(strictRule, fmt.Sprintf("%s taxable amount must match the syntax-specific EN 16931 category basis (expected %s, got %s)", label, calculated.String(), declared.String()))
 	}
 }

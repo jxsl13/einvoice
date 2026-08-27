@@ -11,6 +11,184 @@ permissions:
   contents: read
 
 jobs:
+  rule-inventory:
+    name: Pinned rule inventory
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: '1.26.6'
+        cache: true
+
+    - name: Download checksum-pinned Schematron source archive
+      shell: bash
+      run: |
+        set -euo pipefail
+        archive="${RUNNER_TEMP}/xrechnung-schematron.zip"
+        url="$(jq -er '.dependencies.xrechnungSchematron.url' .github/dependencies/parity.json)"
+        curl --fail --location --proto '=https' --tlsv1.2 --output "${archive}" "${url}"
+
+    - name: Verify deterministic rule inventory
+      shell: bash
+      run: |
+        set -euo pipefail
+        archive="${RUNNER_TEMP}/xrechnung-schematron.zip"
+        expected="$(jq -er '.dependencies.xrechnungSchematron.sha256' .github/dependencies/parity.json)"
+        printf '%s  %s\n' "${expected}" "${archive}" | sha256sum --check --strict
+        go run ./cmd/genruleinventory -archive "${archive}" -verify
+        go run ./cmd/checkrulecoverage
+
+  conformance:
+    name: Pinned KoSIT differential gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: '1.26.6'
+        cache: true
+
+    - name: Download and verify the non-shipping oracle toolchain
+      shell: bash
+      run: |
+        set -euo pipefail
+        work="${RUNNER_TEMP}/einvoice-conformance"
+        mkdir -p "${work}/downloads"
+        for key in kositValidator xrechnungConfiguration xrechnungConfigurationSource xrechnungSchematronSource xrechnungTestsuite xmlMutate; do
+          url="$(jq -er --arg key "${key}" '.dependencies[$key].url' .github/dependencies/parity.json)"
+          asset="$(jq -er --arg key "${key}" '.dependencies[$key].asset' .github/dependencies/parity.json)"
+          expected="$(jq -er --arg key "${key}" '.dependencies[$key].sha256' .github/dependencies/parity.json)"
+          curl --fail --location --proto '=https' --tlsv1.2 --retry 3 \
+            --output "${work}/downloads/${asset}" "${url}"
+          printf '%s  %s\n' "${expected}" "${work}/downloads/${asset}" | sha256sum --check --strict
+        done
+
+    - name: Materialize the pinned corpora
+      shell: bash
+      run: |
+        set -euo pipefail
+        work="${RUNNER_TEMP}/einvoice-conformance"
+        config_asset="$(jq -er '.dependencies.xrechnungConfiguration.asset' .github/dependencies/parity.json)"
+        config_source_asset="$(jq -er '.dependencies.xrechnungConfigurationSource.asset' .github/dependencies/parity.json)"
+        schematron_source_asset="$(jq -er '.dependencies.xrechnungSchematronSource.asset' .github/dependencies/parity.json)"
+        testsuite_asset="$(jq -er '.dependencies.xrechnungTestsuite.asset' .github/dependencies/parity.json)"
+        unzip -q "${work}/downloads/${config_asset}" -d "${work}/configuration"
+        unzip -q "${work}/downloads/${config_source_asset}" -d "${work}/configuration-source"
+        unzip -q "${work}/downloads/${schematron_source_asset}" -d "${work}/schematron-source"
+        unzip -q "${work}/downloads/${testsuite_asset}" -d "${work}/testsuite"
+        config_commit="$(jq -er '.dependencies.xrechnungConfigurationSource.version' .github/dependencies/parity.json)"
+        schematron_commit="$(jq -er '.dependencies.xrechnungSchematronSource.version' .github/dependencies/parity.json)"
+        test -d "${work}/configuration-source/validator-configuration-xrechnung-${config_commit}/src/test/cen-unit-test"
+        test -d "${work}/schematron-source/xrechnung-schematron-${schematron_commit}/test/instances"
+        test "$(find "${work}/testsuite/instances/standard" "${work}/testsuite/instances/technical-cases/cius" -type f -name '*.xml' | wc -l | tr -d ' ')" = 78
+        test "$(find "${work}/schematron-source/xrechnung-schematron-${schematron_commit}/test/instances" -type f -name '*.xml' | wc -l | tr -d ' ')" = 349
+
+    - name: Regenerate official XML Mutate witnesses without network access
+      shell: bash
+      run: |
+        set -euo pipefail
+        work="${RUNNER_TEMP}/einvoice-conformance"
+        config_commit="$(jq -er '.dependencies.xrechnungConfigurationSource.version' .github/dependencies/parity.json)"
+        mutate_asset="$(jq -er '.dependencies.xmlMutate.asset' .github/dependencies/parity.json)"
+        image="$(jq -er '.dependencies.oracleRuntime.url' .github/dependencies/parity.json)"
+        docker pull "${image}"
+        mkdir -p "${work}/generated-negative"
+        docker run --rm --network none -v "${work}:/work" "${image}" \
+          java -jar "/work/downloads/${mutate_asset}" \
+          --schematron xrubl=/work/configuration/resources/xrechnung/3.0.2/xsl/XRechnung-UBL-validation.xsl \
+          --schematron cenubl=/work/configuration/resources/ubl/2.1/xsl/EN16931-UBL-validation.xsl \
+          --schematron cencii=/work/configuration/resources/cii/16b/xsl/EN16931-CII-validation.xsl \
+          --target /work/generated-negative \
+          "/work/configuration-source/validator-configuration-xrechnung-${config_commit}/src/test/cen-unit-test"
+        test "$(find "${work}/generated-negative" -type f -name '*.xml' | wc -l | tr -d ' ')" = 91
+
+    - name: Verify the deterministic embedded XSD bundle
+      shell: bash
+      run: |
+        set -euo pipefail
+        work="${RUNNER_TEMP}/einvoice-conformance"
+        go run ./cmd/genxsdassets \
+          -source "${work}/configuration/resources" \
+          -output "${work}/schemas.zip" \
+          -manifest "${work}/schemas.json"
+        cmp "${work}/schemas.zip" internal/xsdvalidate/schemas.zip
+        cmp "${work}/schemas.json" internal/xsdvalidate/schemas.json
+        expected="$(jq -er '.embeddedSchemas.sha256' conformance/xrechnung-3.0.2-report.json)"
+        printf '%s  %s\n' "${expected}" internal/xsdvalidate/schemas.zip | sha256sum --check --strict
+
+    - name: Run the pinned KoSIT oracle without network access
+      shell: bash
+      run: |
+        set -euo pipefail
+        work="${RUNNER_TEMP}/einvoice-conformance"
+        validator_asset="$(jq -er '.dependencies.kositValidator.asset' .github/dependencies/parity.json)"
+        schematron_commit="$(jq -er '.dependencies.xrechnungSchematronSource.version' .github/dependencies/parity.json)"
+        image="$(jq -er '.dependencies.oracleRuntime.url' .github/dependencies/parity.json)"
+        mkdir -p "${work}/reports/generated" "${work}/reports/testsuite" "${work}/reports/schematron"
+        oracle() {
+          local output="$1"
+          local input="$2"
+          local status
+          set +e
+          docker run --rm --network none -v "${work}:/work" "${image}" \
+            java -jar "/work/downloads/${validator_asset}" \
+            -s /work/configuration/scenarios.xml -r /work/configuration \
+            --html -o "${output}" "${input}"
+          status=$?
+          set -e
+          # KoSIT returns the rejected-document count as its process status.
+          # Operational CLI failures use 254/255; exact reports are checked below.
+          if [[ "${status}" -ge 254 ]]; then
+            return "${status}"
+          fi
+        }
+        oracle /work/reports/generated /work/generated-negative
+        oracle /work/reports/testsuite /work/testsuite/instances/standard
+        oracle /work/reports/testsuite /work/testsuite/instances/technical-cases/cius
+        oracle /work/reports/schematron "/work/schematron-source/xrechnung-schematron-${schematron_commit}/test/instances/cii"
+        oracle /work/reports/schematron "/work/schematron-source/xrechnung-schematron-${schematron_commit}/test/instances/ubl-inv"
+        oracle /work/reports/schematron "/work/schematron-source/xrechnung-schematron-${schematron_commit}/test/instances/ubl-cn"
+        test "$(find "${work}/reports/generated" -type f -name '*-report.xml' | wc -l | tr -d ' ')" = 91
+        test "$(find "${work}/reports/testsuite" -type f -name '*-report.xml' | wc -l | tr -d ' ')" = 78
+        test "$(find "${work}/reports/schematron" -type f -name '*-report.xml' | wc -l | tr -d ' ')" = 349
+
+    - name: Require native-Go parity and zero false accepts
+      shell: bash
+      run: |
+        set -euo pipefail
+        work="${RUNNER_TEMP}/einvoice-conformance"
+        schematron_commit="$(jq -er '.dependencies.xrechnungSchematronSource.version' .github/dependencies/parity.json)"
+        go run ./cmd/compareoracle \
+          -reports "${work}/reports/generated" \
+          -source-root "${work}/generated-negative" \
+          -source-prefix /work/generated-negative/
+        go run ./cmd/compareoracle \
+          -reports "${work}/reports/testsuite" \
+          -source-root "${work}/testsuite" \
+          -source-prefix /work/testsuite/
+        go run ./cmd/compareoracle \
+          -reports "${work}/reports/schematron" \
+          -source-root "${work}/schematron-source/xrechnung-schematron-${schematron_commit}/test/instances" \
+          -source-prefix "/work/schematron-source/xrechnung-schematron-${schematron_commit}/test/instances/" \
+          -skip-unsupported-profiles
+        jq -e '
+          .differential.documents == 451 and
+          .differential.verdictMatches == 451 and
+          .differential.fatalOrErrorRuleIdsCompared == 342 and
+          .differential.fatalOrErrorRuleIdMatches == 342 and
+          .differential.falseAccepts == 0
+        ' conformance/xrechnung-3.0.2-report.json >/dev/null
+
   test:
     name: Test
     runs-on: ${{ matrix.os }}
@@ -18,7 +196,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.25', 'stable']
+        go-version: ['1.26.6', 'stable']
 
     steps:
     - name: Checkout code
@@ -43,12 +221,18 @@ jobs:
           xargs go test -v -race -coverprofile=coverage.txt -covermode=atomic
 
     - name: Enforce production-package coverage floor
-      if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.25'
+      if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.26.6'
       shell: bash
       run: |
         coverage="$(go tool cover -func=coverage.txt | awk '/^total:/ {gsub(/%/, "", $3); print $3}')"
         echo "Production-package coverage: ${coverage}%"
         awk -v coverage="${coverage}" 'BEGIN { exit !(coverage + 0 >= 90) }'
+        while read -r package; do
+          package_coverage="$(go test -cover "${package}" | sed -n -E 's/.*coverage: ([0-9.]+)% of statements.*/\1/p')"
+          test -n "${package_coverage}"
+          echo "${package}: ${package_coverage}%"
+          awk -v coverage="${package_coverage}" 'BEGIN { exit !(coverage + 0 >= 90) }'
+        done < <(go list ./... | grep -v -E '/cmd/|/rules$')
 
   lint:
     name: Lint
@@ -61,7 +245,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.25'
+        go-version: '1.26.6'
 
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
@@ -80,7 +264,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.25'
+        go-version: '1.26.6'
         cache: true
 
     - name: Download dependencies
@@ -112,7 +296,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.25'
+        go-version: '1.26.6'
         cache: true
 
     - name: Download dependencies
@@ -132,7 +316,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.25'
+        go-version: '1.26.6'
         cache: true
 
     - name: Test automatic release eligibility policy

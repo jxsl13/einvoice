@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jacoelho/xsd/xsderrors"
 	einvoice "github.com/jxsl13/einvoice"
 )
 
@@ -68,6 +69,33 @@ func TestValidateSupportedFixturesDeterministically(t *testing.T) {
 	}
 }
 
+func TestBaseEN16931AllowsEmptyOptionalElement(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../testdata/ubl/invoice/ubl-tc434-example1.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := bytes.Index(data, []byte("<cbc:Note>"))
+	end := bytes.Index(data, []byte("</cbc:Note>"))
+	if start < 0 || end < start {
+		t.Fatal("fixture has no note to make empty")
+	}
+	end += len("</cbc:Note>")
+	data = append(append(append([]byte(nil), data[:start]...), []byte("<cbc:Note/>")...), data[end:]...)
+
+	result, err := Validate(context.Background(), bytes.NewReader(data), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Profile != ProfileEN16931 {
+		t.Fatalf("profile = %q, want %q", result.Profile, ProfileEN16931)
+	}
+	if hasRule(result.Findings, "PEPPOL-EN16931-R008") {
+		t.Fatalf("base EN 16931 received inapplicable PEPPOL empty-element finding: %#v", result.Findings)
+	}
+}
+
 func TestValidateRejectsUnsupportedProfilesBeforeRuleWeakening(t *testing.T) {
 	t.Parallel()
 	result, err := Validate(context.Background(), strings.NewReader(ubl("urn:example:unsupported", "")), Options{})
@@ -92,6 +120,40 @@ func TestValidateRejectsUnsupportedProfilesBeforeRuleWeakening(t *testing.T) {
 	}
 	if strings.Contains(string(encoded), "SECRET-INVOICE-VALUE") {
 		t.Fatalf("result exposed an invoice value: %s", encoded)
+	}
+}
+
+func TestProductionRulePackAcceptsOnlyPinnedXRechnung(t *testing.T) {
+	t.Parallel()
+	xrechnung, err := os.Open("../testdata/cii/xrechnung/zugferd-xrechnung-einfach.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = xrechnung.Close() }()
+	result, err := Validate(context.Background(), xrechnung, Options{RulePack: RulePackXRechnung302})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RulePack != RulePackXRechnung302 || result.Profile != ProfileXRechnung30 {
+		t.Fatalf("unexpected production result: %#v", result)
+	}
+
+	en16931, err := os.Open("../testdata/ubl/invoice/ubl-tc434-example1.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = en16931.Close() }()
+	_, err = Validate(context.Background(), en16931, Options{RulePack: RulePackXRechnung302})
+	assertErrorKind(t, err, ErrorUnsupportedProfile, "")
+
+	invalid, err := Validate(context.Background(), strings.NewReader(ubl(einvoice.SpecXRechnung30, "")), Options{RulePack: RulePackXRechnung302})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if invalid.Accepted || !slices.ContainsFunc(invalid.Findings, func(finding Finding) bool {
+		return finding.RuleID == schemaRuleID && finding.Severity == SeverityError
+	}) {
+		t.Fatalf("schema-invalid result = %#v", invalid)
 	}
 }
 
@@ -147,7 +209,7 @@ func TestValidateRejectsUnsafeAndMalformedXML(t *testing.T) {
 			kind: ErrorMalformedInput,
 		},
 		{name: "DTD", xml: `<!DOCTYPE Invoice><Invoice xmlns="` + ublInvoiceNS + `"/>`, kind: ErrorMalformedInput},
-		{name: "processing instruction", xml: `<?unsafe value?><Invoice xmlns="` + ublInvoiceNS + `"/>`, kind: ErrorMalformedInput},
+		{name: "duplicate XML declaration", xml: `<?xml version="1.0"?><?xml version="1.0"?><Invoice xmlns="` + ublInvoiceNS + `"/>`, kind: ErrorMalformedInput},
 		{
 			name: "XInclude",
 			xml:  `<Invoice xmlns="` + ublInvoiceNS + `"><xi:include xmlns:xi="` + xincludeNamespace + `" href="file:///etc/passwd"/></Invoice>`,
@@ -165,6 +227,15 @@ func TestValidateRejectsUnsafeAndMalformedXML(t *testing.T) {
 				t.Fatalf("error exposed input: %v", err)
 			}
 		})
+	}
+}
+
+func TestInspectXMLAllowsInertProcessingInstructions(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`<?safe metadata?><Invoice xmlns="` + ublInvoiceNS + `"><?xmute test?></Invoice>`)
+	if syntax, err := inspectXML(context.Background(), data, HardMaxDepth); err != nil || syntax != SyntaxUBL {
+		t.Fatalf("inspectXML() = %q, %v; want UBL without error", syntax, err)
 	}
 }
 
@@ -262,6 +333,49 @@ func TestTypedErrorAndHelperEdges(t *testing.T) {
 
 	_, err := Validate(context.Background(), errorReader{}, Options{})
 	assertErrorKind(t, err, ErrorInternal, "input_read")
+}
+
+func TestSchemaFailureClassificationAndRuleHelpers(t *testing.T) {
+	t.Parallel()
+
+	base := Result{RulePack: RulePackXRechnung302, Syntax: SyntaxUBL}
+	for _, test := range []struct {
+		name       string
+		schemaErr  error
+		contextErr error
+		kind       ErrorKind
+		limit      string
+	}{
+		{name: "context cancellation", schemaErr: errors.New("hidden"), contextErr: context.Canceled, kind: ErrorCanceled},
+		{name: "schema cancellation", schemaErr: context.DeadlineExceeded, kind: ErrorCanceled},
+		{name: "unstructured", schemaErr: errors.New("hidden"), kind: ErrorInternal, limit: "schema_validation"},
+		{name: "resource limit", schemaErr: xsderrors.Validation(xsderrors.CodeValidationLimit, 0, 0, "", "hidden"), kind: ErrorResourceLimit, limit: "schema_validation"},
+		{name: "compile category", schemaErr: xsderrors.SchemaCompile(xsderrors.CodeSchemaRoot, "hidden"), kind: ErrorInternal, limit: "schema_validation"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := schemaFailure(base, test.schemaErr, test.contextErr)
+			if !reflect.DeepEqual(result, Result{}) {
+				t.Fatalf("schemaFailure() result = %#v", result)
+			}
+			assertErrorKind(t, err, test.kind, test.limit)
+		})
+	}
+
+	result, err := schemaFailure(base, xsderrors.Validation(xsderrors.CodeValidationElement, 1, 1, "/Invoice", "hidden"), nil)
+	if err != nil || result.Accepted || result.RulePack != base.RulePack || !hasRule(result.Findings, schemaRuleID) {
+		t.Fatalf("validation finding = %#v, %v", result, err)
+	}
+	if hasRule(result.Findings, "missing") {
+		t.Fatal("hasRule found a missing rule")
+	}
+	if hasRejectingXRechnungWarning([]Finding{{RuleID: "CII-SR-452", Severity: SeverityInfo}}) ||
+		hasRejectingXRechnungWarning([]Finding{{RuleID: "other", Severity: SeverityWarning}}) ||
+		!hasRejectingXRechnungWarning([]Finding{{RuleID: "CII-SR-453", Severity: SeverityWarning}}) {
+		t.Fatal("unexpected XRechnung warning classification")
+	}
+	if isProfileElement(Syntax("future"), nil, xmlName("", "x")) {
+		t.Fatal("unknown syntax yielded a profile element")
+	}
 }
 
 func FuzzValidate(f *testing.F) {

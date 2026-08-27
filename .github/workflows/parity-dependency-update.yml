@@ -40,7 +40,7 @@ jobs:
           work="$(mktemp -d)"
           trap 'rm -rf "${work}"' EXIT
 
-          resolve() {
+          resolve_release() {
             local key="$1"
             local repository="$2"
             local asset_filter="$3"
@@ -48,7 +48,7 @@ jobs:
 
             release="$(gh api "repos/${repository}/releases/latest")"
             asset="$(jq -cer --arg filter "${asset_filter}" \
-              '.assets[] | select(.name | test($filter))' <<<"${release}")"
+              'first(.assets[] | select(.name | test($filter)))' <<<"${release}")"
             digest="$(jq -r '.digest // ""' <<<"${asset}")"
             if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
               echo "Missing trusted SHA-256 for ${repository}" >&2
@@ -69,20 +69,87 @@ jobs:
               --arg asset "$(jq -r '.name' <<<"${asset}")" \
               --arg url "${url}" \
               --arg sha256 "${actual}" \
-              '{repository:$repository,version:$version,asset:$asset,url:$url,sha256:$sha256,license:"Apache-2.0"}'
+              '{repository:$repository,version:$version,asset:$asset,url:$url,sha256:$sha256,license:"Apache-2.0",ships:false}'
           }
 
-          validator="$(resolve validator itplr-kosit/validator 'standalone\.jar$')"
-          configuration="$(resolve configuration itplr-kosit/validator-configuration-xrechnung 'validator-configuration-.*\.zip$')"
-          schematron="$(resolve schematron itplr-kosit/xrechnung-schematron 'schematron-.*\.zip$')"
+          pin_url() {
+            local key="$1" repository="$2" version="$3" asset="$4" url="$5" license="$6" ships="$7"
+            local actual
+            curl --fail --location --silent --show-error --max-time 120 \
+              --output "${work}/${key}" "${url}"
+            actual="$(sha256sum "${work}/${key}" | cut -d ' ' -f 1)"
+            jq -cn --arg repository "${repository}" --arg version "${version}" \
+              --arg asset "${asset}" --arg url "${url}" --arg sha256 "${actual}" \
+              --arg license "${license}" --argjson ships "${ships}" \
+              '{repository:$repository,version:$version,asset:$asset,url:$url,sha256:$sha256,license:$license,ships:$ships}'
+          }
+
+          source_pin() {
+            local key="$1" repository="$2" tag="$3" license="$4"
+            local commit asset url
+            commit="$(gh api "repos/${repository}/commits/${tag}" --jq '.sha')"
+            asset="${commit}.zip"
+            url="https://github.com/${repository}/archive/${commit}.zip"
+            pin_url "${key}" "${repository}" "${commit}" "${asset}" "${url}" "${license}" false
+          }
+
+          property() {
+            local name="$1" file="$2"
+            sed -n -E "s/.*name=\"${name}\" value=\"([^\"]+)\".*/\1/p" "${file}" | head -n 1
+          }
+
+          validator="$(resolve_release validator itplr-kosit/validator 'standalone\.jar$')"
+          configuration="$(resolve_release configuration itplr-kosit/validator-configuration-xrechnung 'validator-configuration-.*\.zip$')"
+          schematron="$(resolve_release schematron itplr-kosit/xrechnung-schematron 'schematron-.*\.zip$')"
+          configuration_source="$(source_pin configuration-source itplr-kosit/validator-configuration-xrechnung "$(jq -r '.version' <<<"${configuration}")" Apache-2.0)"
+          schematron_source="$(source_pin schematron-source itplr-kosit/xrechnung-schematron "$(jq -r '.version' <<<"${schematron}")" Apache-2.0)"
+
+          mkdir -p "${work}/configuration-source-unpacked"
+          unzip -q "${work}/configuration-source" -d "${work}/configuration-source-unpacked"
+          config_commit="$(jq -r '.version' <<<"${configuration_source}")"
+          build="${work}/configuration-source-unpacked/validator-configuration-xrechnung-${config_commit}/build.xml"
+          test -f "${build}"
+          xr_version="$(property xrechnung.version.major.minor "${build}").$(property xrechnung.version.patch "${build}")"
+          testsuite_version="$(property xr.testsuite.version "${build}")"
+          mutate_version="$(property xmute.version.full "${build}")"
+          cen_version="$(property cen.rules.version "${build}")"
+          ubl_version="$(property ubl.version "${build}")"
+          cii_version="$(property cii.version "${build}")"
+
+          testsuite_asset="xrechnung-${xr_version}-testsuite-${testsuite_version}.zip"
+          testsuite_url="https://projekte.kosit.org/api/v4/projects/356/packages/maven/de/xeinkauf/xrechnung-${xr_version}-testsuite/${testsuite_version}/${testsuite_asset}"
+          testsuite="$(pin_url testsuite itplr-kosit/validator-configuration-xrechnung "${testsuite_version}" "${testsuite_asset}" "${testsuite_url}" Apache-2.0 false)"
+          mutate_asset="xml-mutate-${mutate_version}.jar"
+          mutate_url="https://projekte.kosit.org/api/v4/projects/356/packages/maven/de/kosit/xml-mutate/${mutate_version}/${mutate_asset}"
+          mutate="$(pin_url xml-mutate itplr-kosit/validator-configuration-xrechnung "${mutate_version}" "${mutate_asset}" "${mutate_url}" Apache-2.0 false)"
+          cen_ubl_asset="en16931-ubl-${cen_version}.zip"
+          cen_ubl_url="https://github.com/ConnectingEurope/eInvoicing-EN16931/releases/download/validation-${cen_version}/${cen_ubl_asset}"
+          cen_ubl="$(pin_url cen-ubl ConnectingEurope/eInvoicing-EN16931 "validation-${cen_version}" "${cen_ubl_asset}" "${cen_ubl_url}" EUPL-1.2 false)"
+          cen_cii_asset="en16931-cii-${cen_version}.zip"
+          cen_cii_url="https://github.com/ConnectingEurope/eInvoicing-EN16931/releases/download/validation-${cen_version}/${cen_cii_asset}"
+          cen_cii="$(pin_url cen-cii ConnectingEurope/eInvoicing-EN16931 "validation-${cen_version}" "${cen_cii_asset}" "${cen_cii_url}" EUPL-1.2 false)"
+          ubl_asset="UBL-${ubl_version}.zip"
+          ubl_url="https://docs.oasis-open.org/ubl/os-UBL-${ubl_version}/${ubl_asset}"
+          ubl="$(pin_url ubl OASIS-Open/ubl-2.1 "${ubl_version}" "${ubl_asset}" "${ubl_url}" LicenseRef-OASIS-UBL-2.1 true)"
+          cii_asset="D16B_SCRDM__Subset__CII-${cii_version}.zip"
+          cii_url="https://projekte.kosit.org/api/v4/projects/356/packages/maven/de/xeinkauf/D16B_SCRDM__Subset__CII/${cii_version}/${cii_asset}"
+          cii="$(pin_url cii itplr-kosit/validator-configuration-xrechnung "${cii_version}" "${cii_asset}" "${cii_url}" LicenseRef-UNECE-2015 true)"
+
+          docker pull eclipse-temurin:21-jre >/dev/null
+          oracle_ref="$(docker image inspect eclipse-temurin:21-jre --format '{{index .RepoDigests 0}}')"
+          oracle_digest="${oracle_ref##*@sha256:}"
+          oracle="$(jq -cn --arg url "docker.io/library/eclipse-temurin:21-jre@sha256:${oracle_digest}" --arg sha256 "${oracle_digest}" \
+            '{repository:"library/eclipse-temurin",version:"21-jre",asset:"container-image",url:$url,sha256:$sha256,license:"GPL-2.0-with-classpath-exception",ships:false}')"
 
           jq -Sn \
-            --argjson validator "${validator}" \
-            --argjson configuration "${configuration}" \
-            --argjson schematron "${schematron}" \
-            '{schemaVersion:1,dependencies:{kositValidator:$validator,xrechnungConfiguration:$configuration,xrechnungSchematron:$schematron}}' \
+            --argjson validator "${validator}" --argjson configuration "${configuration}" \
+            --argjson configurationSource "${configuration_source}" --argjson schematron "${schematron}" \
+            --argjson schematronSource "${schematron_source}" --argjson testsuite "${testsuite}" \
+            --argjson mutate "${mutate}" --argjson cenUBL "${cen_ubl}" --argjson cenCII "${cen_cii}" \
+            --argjson ubl "${ubl}" --argjson cii "${cii}" --argjson oracle "${oracle}" \
+            '{schemaVersion:2,dependencies:{kositValidator:$validator,xrechnungConfiguration:$configuration,xrechnungConfigurationSource:$configurationSource,xrechnungSchematron:$schematron,xrechnungSchematronSource:$schematronSource,xrechnungTestsuite:$testsuite,xmlMutate:$mutate,cenUBLRules:$cenUBL,cenCIIRules:$cenCII,ublSchemas:$ubl,ciiSchemas:$cii,oracleRuntime:$oracle}}' \
             > .github/dependencies/parity.json
-          jq -e '.schemaVersion == 1 and (.dependencies | length == 3)' \
+          jq -e '.schemaVersion == 2 and (.dependencies | length == 12) and all(.dependencies[]; (.sha256 | test("^[0-9a-f]{64}$")))' \
             .github/dependencies/parity.json >/dev/null
 
           if git diff --quiet -- .github/dependencies/parity.json; then

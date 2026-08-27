@@ -172,6 +172,8 @@ type Party struct {
 	SpecifiedLegalOrganization      *SpecifiedLegalOrganization // BT-30, BT-47, BT-61
 	VATaxRegistration               string                      // BT-31, BT-48, BT-63
 	FCTaxRegistration               string                      // BT-32
+
+	ublTaxSchemeMissingCompanyID bool
 }
 
 // Characteristic add details to a product, BG-32.
@@ -185,6 +187,10 @@ type Classification struct {
 	ClassCode     string
 	ListID        string
 	ListVersionID string
+
+	// Set while parsing so an absent scheme identifier can be distinguished
+	// from an explicitly supplied (but invalid) empty identifier.
+	hasListIDInXML bool
 }
 
 // InvoiceLine represents one position of items.
@@ -230,8 +236,14 @@ type InvoiceLine struct {
 	// These are set during parsing to distinguish between missing elements and zero values
 	hasLineTotalInXML           bool
 	hasNetPriceInXML            bool
+	hasGrossPriceInXML          bool
 	hasTaxRateApplicablePercent bool
 	linePeriodPresent           bool // true if BG-26 (INVOICE LINE PERIOD) was present in source XML
+	hasNetBasisQuantityInXML    bool
+	hasGrossBasisQuantityInXML  bool
+	grossBasisQuantity          decimal.Decimal
+	grossBasisQuantityUnit      string
+	lineDocumentReferenceCount  int
 }
 
 // PaymentMeans represents a payment means.
@@ -254,6 +266,12 @@ type PaymentMeans struct {
 	hasPayeeAccountInXML       bool // Set when PayeePartyCreditorFinancialAccount element exists
 	hasPayeeIBANInXML          bool // Set when IBANID element exists (even if empty)
 	hasPayeeProprietaryIDInXML bool // Set when ProprietaryID element exists (even if empty)
+	hasPaymentCardInXML        bool
+	hasPaymentMandateInXML     bool
+	hasPayerAccountIDInXML     bool
+	hasPayeeInstitutionInXML   bool
+	hasPayerInstitutionInXML   bool
+	mandateIDXML               string
 }
 
 // AllowanceCharge specifies charges and deductions.
@@ -267,6 +285,14 @@ type AllowanceCharge struct {
 	CategoryTradeTaxType                  string          // BT-95, BT-102
 	CategoryTradeTaxCategoryCode          string          // BT-95, BT-102
 	CategoryTradeTaxRateApplicablePercent decimal.Decimal // BT-96, BT-103
+
+	// Set while parsing so mandatory amount presence is not confused with the
+	// valid numeric value zero.
+	hasActualAmountInXML bool
+	hasBasisAmountInXML  bool
+	hasPercentInXML      bool
+	hasIndicatorInXML    bool
+	indicatorValidXML    bool
 }
 
 // TradeTax is the VAT breakdown for each percentage.
@@ -280,6 +306,18 @@ type TradeTax struct {
 	ExemptionReasonCode string          // BT-121
 	TaxPointDate        time.Time       // BT-7
 	DueDateTypeCode     string          // BT-8
+
+	// Set while parsing so mandatory taxable-amount presence is not confused
+	// with the valid numeric value zero.
+	hasBasisAmountInXML bool
+	hasPercentInXML     bool
+}
+
+type taxTotalXML struct {
+	currency       string
+	amount         decimal.Decimal
+	hasTaxSubtotal bool
+	subtotalSum    decimal.Decimal
 }
 
 func (tt TradeTax) String() string {
@@ -381,17 +419,27 @@ type Invoice struct {
 
 	// Private fields for tracking XML element presence (BR-12 through BR-15, BR-CO-19)
 	// These are set during parsing to distinguish between missing elements and zero values
-	hasLineTotalInXML        bool
-	hasTaxBasisTotalInXML    bool
-	hasGrandTotalInXML       bool
-	hasDuePayableAmountInXML bool
-	hasBillingPeriodInXML    bool // true if BG-14 (INVOICING PERIOD) was present in source XML
+	hasLineTotalInXML          bool
+	hasTaxBasisTotalInXML      bool
+	hasGrandTotalInXML         bool
+	hasDuePayableAmountInXML   bool
+	hasBillingPeriodInXML      bool // true if BG-14 (INVOICING PERIOD) was present in source XML
+	hasTaxTotalAccountingXML   bool // true if BT-111 was present, including a zero amount
+	isUBLCreditNoteXML         bool
+	ciiPaymentTermsCount       int
+	ciiPaymentDescriptionCount int
+	ciiLineTradeTaxInvalid     bool
+	ciiTaxPointDateMax         int
+	ciiDueDateTypeCodes        []string
+	taxTotalsXML               []taxTotalXML
+	peppolEmptyElementCount    int
 
 	// Private field for tracking unexpected TaxTotalAmount currencies during parsing
 	unexpectedTaxCurrencies []string
 
-	violations []SemanticError // Private field - use Validate() and check error instead
-	warnings   []SemanticError // Private field - use Warnings() accessor
+	violations  []SemanticError // Private field - use Validate() and check error instead
+	warnings    []SemanticError // Private field - use Warnings() accessor
+	information []SemanticError
 
 	// operationContext is set only while context-aware validation is running.
 	// Invoice validation already mutates private state and is not concurrent-safe.

@@ -5,7 +5,51 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/shopspring/decimal"
 )
+
+func TestUBLParserPreservesZeroAmountPresenceAndSEPAIdentifier(t *testing.T) {
+	t.Parallel()
+
+	xml := `<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+ xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+ xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+ <cbc:CustomizationID>` + SpecXRechnung30 + `</cbc:CustomizationID>
+ <cbc:DocumentCurrencyCode>EUR</cbc:DocumentCurrencyCode>
+ <cbc:TaxCurrencyCode>USD</cbc:TaxCurrencyCode>
+ <cac:AccountingSupplierParty><cac:Party>
+  <cac:PartyIdentification><cbc:ID schemeID="SEPA">DE98ZZZ09999999999</cbc:ID></cac:PartyIdentification>
+ </cac:Party></cac:AccountingSupplierParty>
+ <cac:AllowanceCharge><cbc:ChargeIndicator>false</cbc:ChargeIndicator><cbc:Amount currencyID="EUR">0</cbc:Amount></cac:AllowanceCharge>
+ <cac:TaxTotal><cbc:TaxAmount currencyID="USD">0</cbc:TaxAmount></cac:TaxTotal>
+ <cac:LegalMonetaryTotal><cbc:PayableRoundingAmount currencyID="EUR">0.01</cbc:PayableRoundingAmount></cac:LegalMonetaryTotal>
+ <cac:InvoiceLine><cbc:ID>1</cbc:ID>
+  <cac:AllowanceCharge><cbc:ChargeIndicator>true</cbc:ChargeIndicator><cbc:Amount currencyID="EUR">0</cbc:Amount></cac:AllowanceCharge>
+ </cac:InvoiceLine>
+</Invoice>`
+
+	inv, err := ParseReader(strings.NewReader(xml))
+	if err != nil {
+		t.Fatalf("parse UBL: %v", err)
+	}
+	if len(inv.SpecifiedTradeAllowanceCharge) != 1 || !inv.SpecifiedTradeAllowanceCharge[0].hasActualAmountInXML {
+		t.Fatal("document allowance amount presence was not preserved")
+	}
+	if len(inv.InvoiceLines) != 1 || len(inv.InvoiceLines[0].InvoiceLineCharges) != 1 ||
+		!inv.InvoiceLines[0].InvoiceLineCharges[0].hasActualAmountInXML {
+		t.Fatal("line charge amount presence was not preserved")
+	}
+	if !inv.hasTaxTotalAccountingXML || !inv.TaxTotalAccounting.IsZero() {
+		t.Fatal("zero accounting VAT total must remain present")
+	}
+	if !inv.RoundingAmount.Equal(decimal.RequireFromString("0.01")) {
+		t.Fatalf("rounding amount = %s, want 0.01", inv.RoundingAmount)
+	}
+	if !hasPartyIdentifierScheme(inv.Seller, "SEPA") {
+		t.Fatal("seller SEPA identifier was not mapped to BT-90")
+	}
+}
 
 // TestUBLDateParsingValid tests that valid UBL dates (ISO 8601: YYYY-MM-DD) parse successfully
 func TestUBLDateParsingValid(t *testing.T) {
@@ -110,6 +154,21 @@ func TestUBLDateParsingValid(t *testing.T) {
 	}
 	if inv.InvoiceLines[0].BillingSpecifiedPeriodEnd.Format("2006-01-02") != "2024-02-10" {
 		t.Errorf("Line BillingSpecifiedPeriodEnd: got %s, want 2024-02-10", inv.InvoiceLines[0].BillingSpecifiedPeriodEnd.Format("2006-01-02"))
+	}
+}
+
+func TestUBLDateParsingWithXMLSchemaTimezone(t *testing.T) {
+	t.Parallel()
+
+	for _, value := range []string{"2024-03-15Z", "2024-03-15+01:00", "2024-03-15-05:30"} {
+		xml := `<Invoice xmlns="` + nsUBLInvoice + `" xmlns:cbc="` + nsUBLCBC + `"><cbc:IssueDate>` + value + `</cbc:IssueDate></Invoice>`
+		inv, err := ParseReader(strings.NewReader(xml))
+		if err != nil {
+			t.Fatalf("ParseReader(%q): %v", value, err)
+		}
+		if got := inv.InvoiceDate.Format("2006-01-02"); got != "2024-03-15" {
+			t.Fatalf("date %q parsed as %q", value, got)
+		}
 	}
 }
 
