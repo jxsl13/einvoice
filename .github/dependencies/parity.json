@@ -1,113 +1,113 @@
 {
-  "schemaVersion": 2,
   "dependencies": {
-    "kositValidator": {
-      "repository": "itplr-kosit/validator",
-      "version": "v1.6.3",
-      "asset": "validator-1.6.3-standalone.jar",
-      "url": "https://github.com/itplr-kosit/validator/releases/download/v1.6.3/validator-1.6.3-standalone.jar",
-      "sha256": "799e64befca97d4080e03608c80b85dd5a5ecc5f4ae4f35d1116ec2855b9a7c9",
-      "license": "Apache-2.0",
-      "ships": false
-    },
-    "xrechnungConfiguration": {
-      "repository": "itplr-kosit/validator-configuration-xrechnung",
-      "version": "v2026-01-31",
-      "asset": "xrechnung-3.0.2-validator-configuration-2026-01-31.zip",
-      "url": "https://github.com/itplr-kosit/validator-configuration-xrechnung/releases/download/v2026-01-31/xrechnung-3.0.2-validator-configuration-2026-01-31.zip",
-      "sha256": "6a5a5911a421b25fbc423f62f93f894df7b236f5d73ca4f84bb222a945082704",
-      "license": "Apache-2.0",
-      "ships": false
-    },
-    "xrechnungConfigurationSource": {
-      "repository": "itplr-kosit/validator-configuration-xrechnung",
-      "version": "4b8cd64524d9af0b8b5db7d541ff7a2bf9827617",
-      "asset": "4b8cd64524d9af0b8b5db7d541ff7a2bf9827617.zip",
-      "url": "https://github.com/itplr-kosit/validator-configuration-xrechnung/archive/4b8cd64524d9af0b8b5db7d541ff7a2bf9827617.zip",
-      "sha256": "215fbec5cfbaf38861957a55ec58af550850d1fefe61807e6a869c56383bb1f2",
-      "license": "Apache-2.0",
-      "ships": false
-    },
-    "xrechnungSchematron": {
-      "repository": "itplr-kosit/xrechnung-schematron",
-      "version": "v2.5.0",
-      "asset": "xrechnung-3.0.2-schematron-2.5.0.zip",
-      "url": "https://github.com/itplr-kosit/xrechnung-schematron/releases/download/v2.5.0/xrechnung-3.0.2-schematron-2.5.0.zip",
-      "sha256": "a0f3d82737759bee8591c298ff24983a8f1c667f85e45a34863c75a242bc6f43",
-      "license": "Apache-2.0",
-      "ships": false
-    },
-    "xrechnungSchematronSource": {
-      "repository": "itplr-kosit/xrechnung-schematron",
-      "version": "c4eb3dae54d65d60875a85c392122b5721a1108d",
-      "asset": "c4eb3dae54d65d60875a85c392122b5721a1108d.zip",
-      "url": "https://github.com/itplr-kosit/xrechnung-schematron/archive/c4eb3dae54d65d60875a85c392122b5721a1108d.zip",
-      "sha256": "3e1a3740ba4152e75943e3741278d1fa63d0d3bd9941caf5af1d3b9d6063506e",
-      "license": "Apache-2.0",
-      "ships": false
-    },
-    "xrechnungTestsuite": {
-      "repository": "itplr-kosit/validator-configuration-xrechnung",
-      "version": "2026-01-31",
-      "asset": "xrechnung-3.0.2-testsuite-2026-01-31.zip",
-      "url": "https://projekte.kosit.org/api/v4/projects/356/packages/maven/de/xeinkauf/xrechnung-3.0.2-testsuite/2026-01-31/xrechnung-3.0.2-testsuite-2026-01-31.zip",
-      "sha256": "a1e2b26d7de6db6903076d4a8548b66ca603e7b25ad17233202a73cfbfeb29ee",
-      "license": "Apache-2.0",
-      "ships": false
-    },
-    "xmlMutate": {
-      "repository": "itplr-kosit/validator-configuration-xrechnung",
-      "version": "0.6",
-      "asset": "xml-mutate-0.6.jar",
-      "url": "https://projekte.kosit.org/api/v4/projects/356/packages/maven/de/kosit/xml-mutate/0.6/xml-mutate-0.6.jar",
-      "sha256": "b7cd05eb21c47e15dbb1d3ef38487aa65539b335e6d6c355015bbaf6ab573bec",
-      "license": "Apache-2.0",
-      "ships": false
+    "cenCIIRules": {
+      "asset": "en16931-cii-1.3.15.zip",
+      "license": "EUPL-1.2",
+      "repository": "ConnectingEurope/eInvoicing-EN16931",
+      "sha256": "dd7335b711f2f492a2e1d23d81f76fae7979857fd538502465b89681263280f4",
+      "ships": false,
+      "url": "https://github.com/ConnectingEurope/eInvoicing-EN16931/releases/download/validation-1.3.15/en16931-cii-1.3.15.zip",
+      "version": "validation-1.3.15"
     },
     "cenUBLRules": {
-      "repository": "ConnectingEurope/eInvoicing-EN16931",
-      "version": "validation-1.3.15",
       "asset": "en16931-ubl-1.3.15.zip",
-      "url": "https://github.com/ConnectingEurope/eInvoicing-EN16931/releases/download/validation-1.3.15/en16931-ubl-1.3.15.zip",
-      "sha256": "974901a9edac022f77f500c337e0804b458d25435dd56a353cfbfb12323f5d3b",
       "license": "EUPL-1.2",
-      "ships": false
-    },
-    "cenCIIRules": {
       "repository": "ConnectingEurope/eInvoicing-EN16931",
-      "version": "validation-1.3.15",
-      "asset": "en16931-cii-1.3.15.zip",
-      "url": "https://github.com/ConnectingEurope/eInvoicing-EN16931/releases/download/validation-1.3.15/en16931-cii-1.3.15.zip",
-      "sha256": "dd7335b711f2f492a2e1d23d81f76fae7979857fd538502465b89681263280f4",
-      "license": "EUPL-1.2",
-      "ships": false
-    },
-    "ublSchemas": {
-      "repository": "OASIS-Open/ubl-2.1",
-      "version": "2.1",
-      "asset": "UBL-2.1.zip",
-      "url": "https://docs.oasis-open.org/ubl/os-UBL-2.1/UBL-2.1.zip",
-      "sha256": "60b80d76394a8a2add90723ecb8e0e2e9d826775de9749df37a72d60703f86ed",
-      "license": "LicenseRef-OASIS-UBL-2.1",
-      "ships": true
+      "sha256": "974901a9edac022f77f500c337e0804b458d25435dd56a353cfbfb12323f5d3b",
+      "ships": false,
+      "url": "https://github.com/ConnectingEurope/eInvoicing-EN16931/releases/download/validation-1.3.15/en16931-ubl-1.3.15.zip",
+      "version": "validation-1.3.15"
     },
     "ciiSchemas": {
-      "repository": "itplr-kosit/validator-configuration-xrechnung",
-      "version": "D16B",
       "asset": "D16B_SCRDM__Subset__CII-D16B.zip",
-      "url": "https://projekte.kosit.org/api/v4/projects/356/packages/maven/de/xeinkauf/D16B_SCRDM__Subset__CII/D16B/D16B_SCRDM__Subset__CII-D16B.zip",
-      "sha256": "3c938995d7ae96ea9a08e6f6bbe1a609682872a302411b2bf102f937e589a206",
       "license": "LicenseRef-UNECE-2015",
-      "ships": true
+      "repository": "itplr-kosit/validator-configuration-xrechnung",
+      "sha256": "3c938995d7ae96ea9a08e6f6bbe1a609682872a302411b2bf102f937e589a206",
+      "ships": true,
+      "url": "https://projekte.kosit.org/api/v4/projects/356/packages/maven/de/xeinkauf/D16B_SCRDM__Subset__CII/D16B/D16B_SCRDM__Subset__CII-D16B.zip",
+      "version": "D16B"
+    },
+    "kositValidator": {
+      "asset": "validator-1.6.3-standalone.jar",
+      "license": "Apache-2.0",
+      "repository": "itplr-kosit/validator",
+      "sha256": "799e64befca97d4080e03608c80b85dd5a5ecc5f4ae4f35d1116ec2855b9a7c9",
+      "ships": false,
+      "url": "https://github.com/itplr-kosit/validator/releases/download/v1.6.3/validator-1.6.3-standalone.jar",
+      "version": "v1.6.3"
     },
     "oracleRuntime": {
-      "repository": "library/eclipse-temurin",
-      "version": "21-jre",
       "asset": "container-image",
-      "url": "docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037",
-      "sha256": "7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037",
       "license": "GPL-2.0-with-classpath-exception",
-      "ships": false
+      "repository": "library/eclipse-temurin",
+      "sha256": "7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037",
+      "ships": false,
+      "url": "docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037",
+      "version": "21-jre"
+    },
+    "ublSchemas": {
+      "asset": "UBL-2.1.zip",
+      "license": "LicenseRef-OASIS-UBL-2.1",
+      "repository": "OASIS-Open/ubl-2.1",
+      "sha256": "60b80d76394a8a2add90723ecb8e0e2e9d826775de9749df37a72d60703f86ed",
+      "ships": true,
+      "url": "https://docs.oasis-open.org/ubl/os-UBL-2.1/UBL-2.1.zip",
+      "version": "2.1"
+    },
+    "xmlMutate": {
+      "asset": "xml-mutate-0.6.jar",
+      "license": "Apache-2.0",
+      "repository": "itplr-kosit/validator-configuration-xrechnung",
+      "sha256": "b7cd05eb21c47e15dbb1d3ef38487aa65539b335e6d6c355015bbaf6ab573bec",
+      "ships": false,
+      "url": "https://projekte.kosit.org/api/v4/projects/356/packages/maven/de/kosit/xml-mutate/0.6/xml-mutate-0.6.jar",
+      "version": "0.6"
+    },
+    "xrechnungConfiguration": {
+      "asset": "xrechnung-3.0.2-validator-configuration-2026-01-31.zip",
+      "license": "Apache-2.0",
+      "repository": "itplr-kosit/validator-configuration-xrechnung",
+      "sha256": "6a5a5911a421b25fbc423f62f93f894df7b236f5d73ca4f84bb222a945082704",
+      "ships": false,
+      "url": "https://github.com/itplr-kosit/validator-configuration-xrechnung/releases/download/v2026-01-31/xrechnung-3.0.2-validator-configuration-2026-01-31.zip",
+      "version": "v2026-01-31"
+    },
+    "xrechnungConfigurationSource": {
+      "asset": "4b8cd64524d9af0b8b5db7d541ff7a2bf9827617.zip",
+      "license": "Apache-2.0",
+      "repository": "itplr-kosit/validator-configuration-xrechnung",
+      "sha256": "215fbec5cfbaf38861957a55ec58af550850d1fefe61807e6a869c56383bb1f2",
+      "ships": false,
+      "url": "https://github.com/itplr-kosit/validator-configuration-xrechnung/archive/4b8cd64524d9af0b8b5db7d541ff7a2bf9827617.zip",
+      "version": "4b8cd64524d9af0b8b5db7d541ff7a2bf9827617"
+    },
+    "xrechnungSchematron": {
+      "asset": "xrechnung-3.0.2-schematron-2.5.0.zip",
+      "license": "Apache-2.0",
+      "repository": "itplr-kosit/xrechnung-schematron",
+      "sha256": "a0f3d82737759bee8591c298ff24983a8f1c667f85e45a34863c75a242bc6f43",
+      "ships": false,
+      "url": "https://github.com/itplr-kosit/xrechnung-schematron/releases/download/v2.5.0/xrechnung-3.0.2-schematron-2.5.0.zip",
+      "version": "v2.5.0"
+    },
+    "xrechnungSchematronSource": {
+      "asset": "c4eb3dae54d65d60875a85c392122b5721a1108d.zip",
+      "license": "Apache-2.0",
+      "repository": "itplr-kosit/xrechnung-schematron",
+      "sha256": "3e1a3740ba4152e75943e3741278d1fa63d0d3bd9941caf5af1d3b9d6063506e",
+      "ships": false,
+      "url": "https://github.com/itplr-kosit/xrechnung-schematron/archive/c4eb3dae54d65d60875a85c392122b5721a1108d.zip",
+      "version": "c4eb3dae54d65d60875a85c392122b5721a1108d"
+    },
+    "xrechnungTestsuite": {
+      "asset": "xrechnung-3.0.2-testsuite-2026-01-31.zip",
+      "license": "Apache-2.0",
+      "repository": "itplr-kosit/validator-configuration-xrechnung",
+      "sha256": "a1e2b26d7de6db6903076d4a8548b66ca603e7b25ad17233202a73cfbfeb29ee",
+      "ships": false,
+      "url": "https://projekte.kosit.org/api/v4/projects/356/packages/maven/de/xeinkauf/xrechnung-3.0.2-testsuite/2026-01-31/xrechnung-3.0.2-testsuite-2026-01-31.zip",
+      "version": "2026-01-31"
     }
-  }
+  },
+  "schemaVersion": 2
 }
